@@ -1,5 +1,9 @@
 # Panthera
 
+![A black panther following a selected path through a dependency graph](assets/panthera-hero.png)
+
+[Transparent logo](assets/panthera-logo.png) · [Artwork and generation prompts](assets/README.md)
+
 An LLM-free Rust experiment for deterministic cancellation testing and conservative
 evidence reuse. No LLMs, embeddings, network clients, application credentials,
 database, or production calls. Cargo needs access to dependencies on the first build;
