@@ -1,0 +1,21 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: Rust format
+        entry: cargo fmt --check
+        language: system
+        pass_filenames: false
+        types: [rust]
+      - id: cargo-test
+        name: Rust tests
+        entry: cargo test --locked
+        language: system
+        pass_filenames: false
+        files: ^(src/|tests/|Cargo\.|contracts\.json)

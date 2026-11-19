@@ -1,0 +1,8 @@
+[
+  {"id":"submission","scenario":"submission","dependencies":["fixture.submission"],"rule":"Repeated submission creates one reservation."},
+  {"id":"cancellation","scenario":"cancellation","dependencies":["fixture.submission","fixture.release"],"rule":"Cancellation releases exactly once, even after a lost acknowledgement and retry."},
+  {"id":"completion","scenario":"completion","dependencies":["fixture.submission","fixture.completion"],"rule":"Repeated completion consumes exactly once."},
+  {"id":"race","scenario":"race","dependencies":["fixture.submission","fixture.release","fixture.completion"],"rule":"The first authorized terminal transition wins; release and consumption are mutually exclusive."},
+  {"id":"authorization","scenario":"authorization","dependencies":["fixture.submission","fixture.authorization","fixture.release"],"rule":"A foreign tenant cannot read or change the job."},
+  {"id":"recovery","scenario":"recovery","dependencies":["fixture.submission","fixture.release","fixture.recovery"],"rule":"Cancellation accepted while the worker is down resolves after restart."}
+]

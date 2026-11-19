@@ -1,0 +1,4 @@
+{
+  "targets": ["examples/pytest_demo/service.py"],
+  "suites": ["examples/pytest_demo/test_service.py"]
+}
