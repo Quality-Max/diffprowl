@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "trials": [
+    {"id": "total_fault", "kind": "function_body", "path": "examples/pytest_demo/service.py", "symbol": "total", "body": "return 0", "expect": "detected", "expect_expand": false},
+    {"id": "remaining_fault", "kind": "function_body", "path": "examples/pytest_demo/service.py", "symbol": "remaining", "body": "return capacity + reserved", "expect": "detected", "expect_expand": false},
+    {"id": "equivalent_total", "kind": "function_body", "path": "examples/pytest_demo/service.py", "symbol": "total", "body": "return quantity * unit_price + 0", "expect": "equivalent", "expect_expand": false},
+    {"id": "shared_fixture", "kind": "replace_text", "path": "examples/pytest_demo/conftest.py", "find": "return 3", "replace": "return 4", "expect": "detected", "expect_expand": true},
+    {"id": "configuration", "kind": "replace_text", "path": "examples/pytest_demo/settings.json", "find": "\"unit_price\": 5", "replace": "\"unit_price\": 6", "expect": "detected", "expect_expand": true}
+  ]
+}
