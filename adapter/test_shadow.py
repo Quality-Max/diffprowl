@@ -2,6 +2,7 @@
 
 import json
 import sys
+import tracemalloc
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -210,6 +211,35 @@ class AdapterTests(unittest.TestCase):
                 request = json.loads(path.read_bytes())
                 self.assertEqual(request["symbols"], current["symbols"])
                 self.assertEqual(request["baseline"]["symbols"], original["symbols"])
+
+    def test_many_batches_do_not_retain_encoded_inventory_copies(self):
+        # The shared inventories nearly fill each request; receipts force 64
+        # batches. Retaining their JSON buffers would consume over 64 MB.
+        current = {"shared": "same", "symbols": {"f": "x" * 500_000}}
+        baseline = {
+            **current,
+            "tests": {f"test_{i:04d}": {"passed": True, "dependencies": ["d" * 300]} for i in range(128)},
+        }
+        limit = 1_001_000
+        retained = []
+
+        def planner(args):
+            retained.append(tracemalloc.get_traced_memory()[0])
+            self.assertLessEqual(Path(args[-1]).stat().st_size, limit)
+            return b'{"expand": false, "selected": [], "reasons": {}}'
+
+        tracemalloc.start()
+        try:
+            with (
+                patch.object(shadow, "MAX_PLAN_BYTES", limit),
+                patch.object(shadow.subprocess, "check_output", side_effect=planner),
+            ):
+                plan = shadow.plan_shadow(current, baseline, self.root, Path("engine"))
+        finally:
+            tracemalloc.stop()
+        self.assertEqual(plan["request_batches"], 64)
+        self.assertEqual(len(retained), 64)
+        self.assertLess(max(retained), 4 * limit)
 
     def test_unsplittable_requests_expand_without_executing_partial_batches(self):
         current = {"shared": "same", "symbols": {"f": "v1"}}

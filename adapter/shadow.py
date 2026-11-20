@@ -254,12 +254,12 @@ def plan_shadow(current, baseline, directory, engine):
     def encode(evidence):
         return json.dumps({"schema": 1, **current, "baseline": evidence}, separators=(",", ":")).encode()
 
-    payloads = []
+    batches = []
 
     def partition(evidence):
-        payload = encode(evidence)
-        if len(payload) <= MAX_PLAN_BYTES:
-            payloads.append(payload)
+        if len(encode(evidence)) <= MAX_PLAN_BYTES:
+            # Keep references to evidence, not a serialized copy of both inventories.
+            batches.append(evidence)
             return True
         if evidence is None or len(evidence["tests"]) < 2:
             return False
@@ -279,10 +279,10 @@ def plan_shadow(current, baseline, directory, engine):
             "transport_fallback": "planner request cannot fit within 16 MiB",
         }
     plans = []
-    for index, payload in enumerate(payloads):
-        name = "plan-request.json" if len(payloads) == 1 else f"plan-request-{index}.json"
+    for index, evidence in enumerate(batches):
+        name = "plan-request.json" if len(batches) == 1 else f"plan-request-{index}.json"
         path = directory / name
-        path.write_bytes(payload)
+        path.write_bytes(encode(evidence))
         plans.append(json.loads(subprocess.check_output([str(engine), "shadow-plan", str(path)])))
     if len(plans) == 1:
         return {**plans[0], "request_batches": 1}

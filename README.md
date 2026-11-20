@@ -237,6 +237,8 @@ The Python adapter automatically partitions baseline test receipts by encoded by
 size to respect the Rust reader's 16 MiB artifact limit. Every batch retains the
 complete current/baseline symbol inventories and shared fingerprints. Requests
 and the combined plan are saved for review; `request_batches` records their count.
+Preflight retains evidence references; each request is encoded and released
+individually so serialized symbol inventories do not accumulate across batches.
 If a single receipt or the shared inventories cannot fit, the plan expands to a
 full run with an explicit `transport_fallback` reason. Planner errors abort the
 comparison; no partial plan is used. Cold and empty baselines still expand.
