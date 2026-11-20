@@ -440,3 +440,17 @@ trials, never successful comparisons. The wall budget is checked between phases
 and bounds test workers; local archive/copy/planning phases are not hard-preempted.
 Raw application output is discarded. No projection is available for an incomplete
 campaign. No skipping or provider billing reduction is implied.
+
+## How-it-works page
+
+`site/index.html` is a self-contained diagram of the pytest selection path:
+fingerprinting, the planner's three questions, and the selected/full comparison.
+It loads no external assets and carries `noindex`. Open the file locally to view it.
+
+Only `site/` is ever published. This repository is private, while a GitHub Pages
+site on the organization's plan is public, so publication is a deliberate act.
+The `Publish approved site` workflow runs only by manual dispatch from `main`,
+by the user named in the `QMAX_DOCS_APPROVER` repository variable, for one exact
+reviewed commit. Enable Pages with **Source: GitHub Actions** and set that
+variable before the first run. Do not place evidence, scopes, receipts or
+application details under `site/`.
