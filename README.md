@@ -349,6 +349,104 @@ and `cargo test --locked` inside that builder. The builder image is pinned;
 Alpine package mirrors are not snapshotted, so these are identified artifacts
 rather than a claim of byte-for-byte reproducible builds.
 
+## Dependency inputs and roadmap
+
+The following adapter features are unreleased development work; they are not
+included in the published `v0.2.0-rc.1` artifact.
+
+See [the roadmap](docs/ROADMAP.md) for evidence gates, CI economics, additional
+languages, production fault contracts and the separate 9lives integration.
+
+Scopes can use `discover` instead of hand-written `targets`/`suites`:
+
+```json
+{"discover": {"targets": ["app"], "suites": ["tests"], "exclude": ["app/generated/*"]},
+ "input_tracking": "files", "resources": ["settings.json"]}
+```
+
+Discovery is deterministic over Git-tracked Python files in reviewed roots;
+suites use `test_*.py`. Untracked files are excluded and the resolved inventory is
+saved with evidence. Existing explicit scopes and default shared-input mode work.
+
+In file mode, tests/helpers have individual file fingerprints. Static import closure
+connects helper consumers; explicit resource opens record file dependencies.
+Collection-time test structure, pytest hook bodies and conftest remain shared.
+By default, fixture setup/teardown,
+import-time calls and background-thread calls are attributed to every test in both
+modes, so cached values cannot lose their producer merely through fixture reuse.
+Imported helpers may therefore select more than their exact consumers.
+Resources with no observed opens are conservatively shared across all tests.
+
+This is a bounded Python collector: native I/O, subprocesses, arbitrary cross-test
+state and filesystem existence/glob dependencies are not qualified. An observed
+open in one test does not establish the absence of unobserved native/metadata
+reads in another. Use shared mode for such scopes. File mode is
+opt-in experimentation, not permission to skip CI tests.
+
+`examples/input_demo` supplies seven strata and three repetitions per stratum.
+Its campaign seed deterministically orders the declared cases; this is a curated
+campaign, not random repository-wide fault coverage. Run:
+
+```sh
+target/debug/panthera qualify . examples/input_demo/scope.json \
+  examples/input_demo/campaign.json artifacts/input-campaign \
+  --python .venv/bin/python --full-every 5
+```
+
+The report retains per-stratum outcomes and a local cost projection. It charges
+one initial profile, all selection preparation, observed full fallbacks and a full
+run every N changes, compared with unprofiled full-worker costs. Negative savings
+remain negative. `qualification_cost` is the actual additional campaign cost;
+`projected_policy` is a hypothetical policy, not measured CI billing. The baseline
+is fixed for this sequence, with no refresh/transfer or queue-time model. Incomplete
+or unqualified campaigns cannot produce a savings projection. Skipping stays off.
+
+
+### Experimental fixture consumers
+
+`"fixture_tracking": "consumers"` attributes observed fixture setup dependencies
+(including nested and dynamically requested fixtures) to all users of the cached
+fixture definition. A cached dynamic producer is linked to its wrapper even when
+the producer was already primed by another test. The default is `"shared"`.
+Teardown, import-time and background
+observations still stay shared. Parameter values are conservatively unioned per
+fixture definition. This mode uses pytest's private active-definition map; an
+absent map forces captured fixture dependencies to be shared. It is qualified only
+by the included regression cases, not across every pytest version or plugin.
+Keep it out of CI selection until application campaigns qualify that scope.
+
+### Bounded historical replay
+
+The source-only tool always compares an independently executed full head suite:
+
+```sh
+python adapter/history.py REPOSITORY SCOPE.json MANIFEST.json ENGINE NEW_OUTPUT
+```
+
+The manifest has `schema: 1`, nonempty `pilot` PR identifiers, `changes` containing
+`pr`, immutable 40-character `base`/`head` Git IDs, `category` and changed `paths`,
+and positive `wall_budget_seconds`, `worker_timeout_seconds`,
+`periodic_full_every`. Keep the manifest fixed before measuring.
+
+It exports tracked Python, pytest.ini and explicitly approved resources from Git;
+other tracked inputs are represented by object IDs and modes, and any change to
+those inputs forces a full run. Exported regular files preserve Git executable
+permissions. It never copies the dirty working tree. The scope
+is the declared suites plus up to five changed `tests/unit/test_*.py` files chosen
+lexicographically. Missing historical suite files are removed per revision; that
+scope drift invalidates reuse. This bounded policy is not whole-repository coverage.
+
+Each change pays for its own exact-base profile, preparation and planning; the
+projection includes full fallbacks and periodic full runs. Both selected and full
+are actually executed for observation. It records current installed packages, not
+historical dependency environments. Collection errors and timeouts remain incomplete
+trials, never successful comparisons, including an incomplete base followed by a
+complete head. A complete but failing base instead forces a full fallback.
+The wall budget is checked between phases
+and bounds test workers; local archive/copy/planning phases are not hard-preempted.
+Raw application output is discarded. No projection is available for an incomplete
+campaign. No skipping or provider billing reduction is implied.
+
 ## How-it-works page
 
 `site/index.html` is a self-contained diagram of the pytest selection path:

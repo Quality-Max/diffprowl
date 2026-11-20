@@ -29,7 +29,7 @@ fn qualify(args: &[String]) -> Result<i32> {
         "python3".into()
     };
     if args.len() < 4 {
-        return Err("qualify requires REPOSITORY SCOPE.json CAMPAIGN.json OUTPUT_DIR [--python PYTHON] [--timeout SECONDS]".into());
+        return Err("qualify requires REPOSITORY SCOPE.json CAMPAIGN.json OUTPUT_DIR [--python PYTHON] [--timeout SECONDS] [--full-every N]".into());
     }
     // Embed the adapter so a copied release binary does not need a source checkout.
     // Materialize it temporarily because pytest workers launch shadow.py by path.
@@ -115,7 +115,7 @@ fn cli() -> Result<i32> {
         }
         Some("help" | "--help" | "-h") | None => {
             println!(
-                "panthera demo OUTPUT_DIR [SEEDS=32] [REPETITIONS=25]\npanthera run OUTPUT_DIR DEFECT [SEEDS=32] [BASELINE_EVIDENCE.json]\npanthera replay REPLAY.json\npanthera shadow-plan REQUEST.json\npanthera qualify REPOSITORY SCOPE.json CAMPAIGN.json OUTPUT_DIR [--python PYTHON] [--timeout SECONDS]\n\nDefects: none, double_release, missing_authorization, lost_cancellation, double_settlement, duplicate_submission\nExit codes: 0 success/matching replay, 1 detected regression or failed experiment, 2 invalid input/I/O.\nLocal fixture only. Evidence is trusted local input, not a signed CI attestation."
+                "panthera demo OUTPUT_DIR [SEEDS=32] [REPETITIONS=25]\npanthera run OUTPUT_DIR DEFECT [SEEDS=32] [BASELINE_EVIDENCE.json]\npanthera replay REPLAY.json\npanthera shadow-plan REQUEST.json\npanthera qualify REPOSITORY SCOPE.json CAMPAIGN.json OUTPUT_DIR [--python PYTHON] [--timeout SECONDS] [--full-every N]\n\nDefects: none, double_release, missing_authorization, lost_cancellation, double_settlement, duplicate_submission\nExit codes: 0 success/matching replay, 1 detected regression or failed experiment, 2 invalid input/I/O.\nLocal fixture only. Evidence is trusted local input, not a signed CI attestation."
             );
             Ok(0)
         }

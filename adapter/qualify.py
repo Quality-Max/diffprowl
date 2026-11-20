@@ -4,6 +4,7 @@ import argparse
 import ast
 import json
 import re
+import random
 import resource
 import shutil
 import subprocess
@@ -34,8 +35,15 @@ def elapsed(start):
 
 
 def validate_campaign(campaign):
-    if set(campaign) != {"schema", "trials"} or campaign["schema"] != 1 or not campaign["trials"]:
+    if (
+        not {"schema", "trials"} <= campaign.keys()
+        or campaign.keys() - {"schema", "trials", "seed"}
+        or campaign["schema"] != 1
+        or not campaign["trials"]
+    ):
         raise QualificationError("campaign requires schema 1 and nonempty trials")
+    if "seed" in campaign and type(campaign["seed"]) is not int:
+        raise QualificationError("seed must be an integer")
     seen = set()
     for trial in campaign["trials"]:
         fields = {"id", "kind", "path", "expect", "expect_expand"}
@@ -45,6 +53,10 @@ def validate_campaign(campaign):
             fields |= {"find", "replace"}
         else:
             raise QualificationError("unsupported mutation kind")
+        if "stratum" in trial:
+            fields.add("stratum")
+            if trial["stratum"] not in {"function", "fixture", "import", "resource", "test", "helper", "configuration"}:
+                raise QualificationError("invalid mutation stratum")
         if set(trial) != fields or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", trial["id"]):
             raise QualificationError("invalid mutation fields or id")
         key = trial["id"].casefold()
@@ -169,16 +181,58 @@ def compare(full, selected, plan, inventory, trial):
     }
 
 
-def campaign(repository, config, mutations, engine, output, timeout):
+def cost_projection(report, full_every):
+    """Counterfactual local costs; never claim measured CI/provider savings."""
+    if not report["qualified"]:
+        return {"available": False, "reason": "campaign not qualified"}
+    trials = report["trials"]
+    result = {
+        "available": True,
+        "scope": "local measured samples; hypothetical CI policy",
+        "periodic_full_every": full_every,
+        "changes": len(trials),
+        "profile_charges": 1,
+        "baseline_refreshes": 0,
+        "fallback_runs": sum(t["expand"] for t in trials),
+        "periodic_full_runs": len(trials) // full_every,
+        "qualification_cost": report["total_cost"],
+        "metrics": {},
+    }
+    for metric in ("wall_seconds", "cpu_seconds"):
+        ordinary = sum(t["full_worker_cost"][metric] for t in trials)
+        projected = report["profile_cost"][metric]
+        for index, item in enumerate(trials, 1):
+            # Retain planning even for periodic/full fallbacks: conservative overhead.
+            projected += item["selection_overhead"][metric]
+            projected += item["full_cost" if index % full_every == 0 or item["expand"] else "selected_cost"][metric]
+        result["metrics"][metric] = {
+            "ordinary_full": ordinary,
+            "projected_policy": projected,
+            "net_saved": ordinary - projected,
+            "saved_fraction": (ordinary - projected) / ordinary if ordinary else None,
+        }
+    return result
+
+
+def campaign(repository, config, mutations, engine, output, timeout, full_every=10):
     validate_campaign(mutations)
-    a.configure(config)
+    if type(full_every) is not int or full_every < 1:
+        raise QualificationError("periodic full interval must be positive")
+    manifest = mutations
+    mutations = {**mutations, "trials": list(mutations["trials"])}
+    if "seed" in mutations:
+        random.Random(mutations["seed"]).shuffle(mutations["trials"])
+    a.configure(config, repository)
+    config = a.CONFIG
     output.mkdir(parents=True, exist_ok=False)
     start = clock()
     write(output / "scope.json", config)
-    write(output / "campaign.json", mutations)
+    # Preserve the input order: replaying this manifest must not shuffle twice.
+    write(output / "campaign.json", manifest)
     shutil.copyfile(__file__, output / "qualify.py")
     shutil.copyfile(a.__file__, output / "shadow.py")
     report = {"schema": 1, "shadow_only": True, "qualified": False, "complete": False, "trials": []}
+    report["execution_order"] = [trial["id"] for trial in mutations["trials"]]
     write(output / "report.json", report)
     try:
         with tempfile.TemporaryDirectory(prefix="panthera-qualify-") as temp:
@@ -222,7 +276,13 @@ def campaign(repository, config, mutations, engine, output, timeout):
                 trial_start = clock()
                 directory = output / trial["id"]
                 directory.mkdir()
-                item = {"id": trial["id"], "complete": False, "qualified": False, "missed_failures": None}
+                item = {
+                    "stratum": trial.get("stratum", "unspecified"),
+                    "id": trial["id"],
+                    "complete": False,
+                    "qualified": False,
+                    "missed_failures": None,
+                }
                 try:
                     shutil.copytree(pristine, root)
                     item["mutation"] = mutate(root, trial)
@@ -236,6 +296,7 @@ def campaign(repository, config, mutations, engine, output, timeout):
                     write(directory / "plan.json", plan)
                     item.update(expand=plan["expand"], request_batches=plan["request_batches"])
                     shutil.rmtree(root)
+                    item["selection_overhead"] = elapsed(trial_start)
                     runs = {}
                     order = ["selected", "full"] if index % 2 == 0 else ["full", "selected"]
                     item["order"] = order
@@ -249,6 +310,7 @@ def campaign(repository, config, mutations, engine, output, timeout):
                         runs[role] = a.run_tests(
                             root, directory / f"{role}.json", selection, collect_dependencies=False, timeout=timeout
                         )
+                        item[role + "_worker_cost"] = {k: runs[role][k] for k in ("wall_seconds", "cpu_seconds")}
                         write(directory / f"{role}.json", runs[role])
                         if a.snapshot(root, engine) != current:
                             raise QualificationError("source drift during execution")
@@ -280,6 +342,16 @@ def campaign(repository, config, mutations, engine, output, timeout):
         if isinstance(error, QualificationError):
             report["reason"] = str(error)
     report["total_cost"] = elapsed(start)
+    report["cost_projection"] = cost_projection(report, full_every)
+    report["strata"] = {
+        name: {
+            "trials": len(items),
+            "qualified": sum(t["qualified"] for t in items),
+            "complete": sum(t["complete"] for t in items),
+        }
+        for name in sorted({t["stratum"] for t in report["trials"]})
+        if (items := [t for t in report["trials"] if t["stratum"] == name])
+    }
     write(output / "report.json", report)
     return report
 
@@ -288,6 +360,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("repository", "scope", "mutations", "output", "engine"):
         parser.add_argument(name, type=Path)
+    parser.add_argument("--full-every", type=int, default=10)
     parser.add_argument("--timeout", type=float, default=180)
     args = parser.parse_args()
     if not 0 < args.timeout <= 86400:
@@ -300,6 +373,7 @@ def main():
             args.engine.resolve(),
             args.output.resolve(),
             args.timeout,
+            args.full_every,
         )
     except Exception as error:
         # Malformed local input must not print source snippets or application data.

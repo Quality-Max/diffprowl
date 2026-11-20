@@ -1,0 +1,216 @@
+{
+  "schema": 1,
+  "seed": 20261120,
+  "trials": [
+    {
+      "id": "cached_producer_0",
+      "stratum": "fixture",
+      "kind": "replace_text",
+      "path": "examples/input_demo/app/service.py",
+      "find": "return 1",
+      "replace": "return 9",
+      "expect": "detected",
+      "expect_expand": false
+    },
+    {
+      "id": "direct_0",
+      "stratum": "function",
+      "kind": "replace_text",
+      "path": "examples/input_demo/app/service.py",
+      "find": "return 2",
+      "replace": "return 9",
+      "expect": "detected",
+      "expect_expand": false
+    },
+    {
+      "id": "conftest_0",
+      "stratum": "configuration",
+      "kind": "replace_text",
+      "path": "examples/input_demo/conftest.py",
+      "find": "return 3",
+      "replace": "return 9",
+      "expect": "detected",
+      "expect_expand": true
+    },
+    {
+      "id": "import_constant_0",
+      "stratum": "import",
+      "kind": "replace_text",
+      "path": "examples/input_demo/app/__init__.py",
+      "find": "VERSION = 1",
+      "replace": "VERSION = 9",
+      "expect": "detected",
+      "expect_expand": true
+    },
+    {
+      "id": "helper_0",
+      "stratum": "helper",
+      "kind": "replace_text",
+      "path": "examples/input_demo/tests/helpers.py",
+      "find": "return 2",
+      "replace": "return 9",
+      "expect": "detected",
+      "expect_expand": false
+    },
+    {
+      "id": "resource_0",
+      "stratum": "resource",
+      "kind": "replace_text",
+      "path": "examples/input_demo/settings.json",
+      "find": "4",
+      "replace": "9",
+      "expect": "detected",
+      "expect_expand": false
+    },
+    {
+      "id": "changed_test_0",
+      "stratum": "test",
+      "kind": "replace_text",
+      "path": "examples/input_demo/tests/test_first.py",
+      "find": "== 1",
+      "replace": "== 9",
+      "expect": "detected",
+      "expect_expand": false
+    },
+    {
+      "id": "cached_producer_1",
+      "stratum": "fixture",
+      "kind": "replace_text",
+      "path": "examples/input_demo/app/service.py",
+      "find": "return 1",
+      "replace": "return 9",
+      "expect": "detected",
+      "expect_expand": false
+    },
+    {
+      "id": "direct_1",
+      "stratum": "function",
+      "kind": "replace_text",
+      "path": "examples/input_demo/app/service.py",
+      "find": "return 2",
+      "replace": "return 9",
+      "expect": "detected",
+      "expect_expand": false
+    },
+    {
+      "id": "conftest_1",
+      "stratum": "configuration",
+      "kind": "replace_text",
+      "path": "examples/input_demo/conftest.py",
+      "find": "return 3",
+      "replace": "return 9",
+      "expect": "detected",
+      "expect_expand": true
+    },
+    {
+      "id": "import_constant_1",
+      "stratum": "import",
+      "kind": "replace_text",
+      "path": "examples/input_demo/app/__init__.py",
+      "find": "VERSION = 1",
+      "replace": "VERSION = 9",
+      "expect": "detected",
+      "expect_expand": true
+    },
+    {
+      "id": "helper_1",
+      "stratum": "helper",
+      "kind": "replace_text",
+      "path": "examples/input_demo/tests/helpers.py",
+      "find": "return 2",
+      "replace": "return 9",
+      "expect": "detected",
+      "expect_expand": false
+    },
+    {
+      "id": "resource_1",
+      "stratum": "resource",
+      "kind": "replace_text",
+      "path": "examples/input_demo/settings.json",
+      "find": "4",
+      "replace": "9",
+      "expect": "detected",
+      "expect_expand": false
+    },
+    {
+      "id": "changed_test_1",
+      "stratum": "test",
+      "kind": "replace_text",
+      "path": "examples/input_demo/tests/test_first.py",
+      "find": "== 1",
+      "replace": "== 9",
+      "expect": "detected",
+      "expect_expand": false
+    },
+    {
+      "id": "cached_producer_2",
+      "stratum": "fixture",
+      "kind": "replace_text",
+      "path": "examples/input_demo/app/service.py",
+      "find": "return 1",
+      "replace": "return 9",
+      "expect": "detected",
+      "expect_expand": false
+    },
+    {
+      "id": "direct_2",
+      "stratum": "function",
+      "kind": "replace_text",
+      "path": "examples/input_demo/app/service.py",
+      "find": "return 2",
+      "replace": "return 9",
+      "expect": "detected",
+      "expect_expand": false
+    },
+    {
+      "id": "conftest_2",
+      "stratum": "configuration",
+      "kind": "replace_text",
+      "path": "examples/input_demo/conftest.py",
+      "find": "return 3",
+      "replace": "return 9",
+      "expect": "detected",
+      "expect_expand": true
+    },
+    {
+      "id": "import_constant_2",
+      "stratum": "import",
+      "kind": "replace_text",
+      "path": "examples/input_demo/app/__init__.py",
+      "find": "VERSION = 1",
+      "replace": "VERSION = 9",
+      "expect": "detected",
+      "expect_expand": true
+    },
+    {
+      "id": "helper_2",
+      "stratum": "helper",
+      "kind": "replace_text",
+      "path": "examples/input_demo/tests/helpers.py",
+      "find": "return 2",
+      "replace": "return 9",
+      "expect": "detected",
+      "expect_expand": false
+    },
+    {
+      "id": "resource_2",
+      "stratum": "resource",
+      "kind": "replace_text",
+      "path": "examples/input_demo/settings.json",
+      "find": "4",
+      "replace": "9",
+      "expect": "detected",
+      "expect_expand": false
+    },
+    {
+      "id": "changed_test_2",
+      "stratum": "test",
+      "kind": "replace_text",
+      "path": "examples/input_demo/tests/test_first.py",
+      "find": "== 1",
+      "replace": "== 9",
+      "expect": "detected",
+      "expect_expand": false
+    }
+  ]
+}

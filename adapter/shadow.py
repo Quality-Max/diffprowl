@@ -6,6 +6,7 @@ import argparse
 import ast
 import contextlib
 import hashlib
+import fnmatch
 import importlib.metadata
 import json
 import os
@@ -25,8 +26,45 @@ TARGETS = []
 SUITES = []
 
 
-def configure(config):
+def discover(config, repository, paths=None):
+    """Resolve reviewed roots against Git, never filesystem/untracked discovery."""
+    spec = config.get("discover")
+    if spec is None:
+        return dict(config)
+    if paths is None:
+        paths = subprocess.check_output(["git", "ls-files", "-z"], cwd=repository).decode().split("\0")
+    result = dict(config)
+    for kind in ("targets", "suites"):
+        roots = spec.get(kind, [])
+        for name in roots:
+            path = Path(name)
+            if path.is_absolute() or ".." in path.parts or not name:
+                raise ValueError("discovery roots must be relative")
+        result[kind] = sorted(
+            {
+                name
+                for name in paths
+                if name.endswith(".py")
+                and any(root == "." or name == root or name.startswith(root.rstrip("/") + "/") for root in roots)
+                and not any(fnmatch.fnmatchcase(name, pattern) for pattern in spec.get("exclude", []))
+                and (kind != "suites" or Path(name).name.startswith("test_"))
+            }
+        )
+    # Test and fixture code retains file-level fingerprints, not body reuse.
+    result["targets"] = [
+        name for name in result["targets"] if name not in result["suites"] and Path(name).name != "conftest.py"
+    ]
+    return result
+
+
+def configure(config, repository=None):
     global CONFIG, TARGETS, SUITES
+    if repository is not None:
+        config = discover(config, repository)
+    if config.get("input_tracking", "shared") not in {"shared", "files"}:
+        raise ValueError("unknown input tracking mode")
+    if config.get("fixture_tracking", "shared") not in {"shared", "consumers"}:
+        raise ValueError("unknown fixture tracking mode")
     CONFIG = config
     TARGETS = config["targets"]
     SUITES = config["suites"]
@@ -94,11 +132,27 @@ def snapshot(root, engine):
             and (path.suffix == ".py" or path.name == "pytest.ini")
             and path.relative_to(root).as_posix() not in TARGETS
         ):
-            shared[path.relative_to(root).as_posix()] = digest(path.read_bytes())
+            name = path.relative_to(root).as_posix()
+            if name in SUITES:
+                # Collection-time effects and inventory changes remain global.
+                shared["suite_structure:" + name] = symbols(path.read_text())[1]
+                shared["suite_hooks:" + name] = [
+                    ast.dump(node, include_attributes=False)
+                    for node in ast.walk(ast.parse(path.read_text()))
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("pytest_")
+                ]
+            if CONFIG.get("input_tracking") == "files" and path.suffix == ".py" and path.name != "conftest.py":
+                functions["file:" + name] = digest(path.read_bytes())
+            else:
+                shared[name] = digest(path.read_bytes())
     shared["runtime"] = [sys.version, platform.system(), platform.machine()]
     shared["packages"] = sorted((d.metadata["Name"] or "", d.version) for d in importlib.metadata.distributions())
     shared["adapter"] = digest(Path(__file__).read_bytes())
-    shared["resources"] = {name: digest(resource_file(root, name).read_bytes()) for name in CONFIG.get("resources", [])}
+    resources = {name: digest(resource_file(root, name).read_bytes()) for name in CONFIG.get("resources", [])}
+    if CONFIG.get("input_tracking") == "files":
+        functions.update({"file:" + name: value for name, value in resources.items()})
+    else:
+        shared["resources"] = resources
     return {"shared": digest(json.dumps(shared, sort_keys=True).encode()), "symbols": functions}
 
 
@@ -198,24 +252,151 @@ class Recorder:
         for target in TARGETS:
             items, _ = symbols((root / target).read_text())
             self.functions.update(target + "::" + name for name in items)
+        self.root = root.resolve()
+        self.file_inputs = {}
+        self.imports = {}
+        if CONFIG.get("input_tracking") == "files":
+            sources = {p.relative_to(root).as_posix(): p for p in root.rglob("*.py")}
+            for name, path in sources.items():
+                if name not in TARGETS and path.name != "conftest.py":
+                    self.file_inputs[str(path.resolve())] = "file:" + name
+            for name in CONFIG.get("resources", []):
+                self.file_inputs[str((root / name).resolve())] = "file:" + name
+            # Static closure covers test modules used as helpers, including cached imports.
+            modules = {name.removesuffix(".py").replace("/", ".").removesuffix(".__init__"): name for name in sources}
+            for name, path in sources.items():
+                edges = set()
+                package = name.split("/")[:-1]
+                for node in ast.walk(ast.parse(path.read_text())):
+                    if isinstance(node, ast.Import):
+                        names = [alias.name for alias in node.names]
+                    elif isinstance(node, ast.ImportFrom):
+                        prefix = package[: len(package) - node.level + 1] if node.level else []
+                        base = ".".join(prefix + ([node.module] if node.module else []))
+                        names = [base] + [base + "." + alias.name for alias in node.names]
+                    else:
+                        continue
+                    for module in names:
+                        parts = module.split(".")
+                        edges.update(
+                            modules[prefix]
+                            for i in range(1, len(parts) + 1)
+                            if (prefix := ".".join(parts[:i])) in modules
+                        )
+                self.imports[name] = edges
+        self.shared_dependencies = set()
+        self.fixture_stack = []
+        self.fixture_dependencies = {}
+        self.fixture_edges = {}
+        self.fixture_consumers = {}
+        self.fixture_graph_valid = True
+        self.phase = None
+        self.enabled = False
         self.tests = {}
         self.active = None
         self.collection_errors = 0
         self.collected = []
 
+    def record(self, key):
+        if self.active is not None:
+            self.tests[self.active]["dependencies"].add(key)
+        if (
+            CONFIG.get("fixture_tracking") == "consumers"
+            and self.fixture_stack
+            and self.phase in {"setup", "call"}
+            and threading.current_thread() is threading.main_thread()
+        ):
+            for fixture in self.fixture_stack:
+                self.fixture_dependencies.setdefault(fixture, set()).add(key)
+            return
+        if self.active is None or self.phase != "call" or threading.current_thread() is not threading.main_thread():
+            self.shared_dependencies.add(key)
+
+    def attach_fixtures(self, item):
+        # pytest has no public hook for a cached/dynamic fixture lookup. This
+        # opt-in adapter uses its active-definition map; absent/changed shape
+        # broadens all captured fixture dependencies instead of trusting it.
+        definitions = getattr(getattr(item, "_request", None), "_fixture_defs", None)
+        if not isinstance(definitions, dict):
+            self.fixture_graph_valid = False
+            return
+        self.fixture_consumers.setdefault(item.nodeid, set()).update(definitions.values())
+
+    def attach_fixture_edges(self, fixture, request):
+        # A dynamic lookup can reuse a primed producer without executing its
+        # body. Retain that definition edge for later cached wrapper consumers.
+        definitions = getattr(request, "_fixture_defs", None)
+        if not isinstance(definitions, dict):
+            self.fixture_graph_valid = False
+            return
+        self.fixture_edges.setdefault(fixture, set()).update(
+            value for value in definitions.values() if value is not fixture
+        )
+
     def profile(self, frame, event, _arg):
-        if event == "call" and self.active is not None and frame.f_code.co_filename in self.targets:
+        if event != "call":
+            return
+        filename = frame.f_code.co_filename
+        if filename in self.targets:
             name = frame.f_code.co_qualname.split(".<locals>.")[0]
-            key = self.targets[frame.f_code.co_filename] + "::" + name
+            key = self.targets[filename] + "::" + name
             if key in self.functions:
-                self.tests[self.active]["dependencies"].add(key)
+                self.record(key)
+        elif filename in self.file_inputs:
+            # Pytest imports all suite modules at collection; their own file and
+            # static import closure are attached at logstart instead.
+            name = self.file_inputs[filename][5:]
+            if frame.f_code.co_name != "<module>" or name not in SUITES:
+                self.record(self.file_inputs[filename])
+
+    def audit(self, event, args):
+        if not self.enabled or event != "open" or not isinstance(args[0], (str, bytes)):
+            return
+        path = os.path.abspath(os.fsdecode(args[0]))
+        key = self.file_inputs.get(path)
+        # Python source loader opens are handled by import closure/profile.
+        if key and key[5:] in CONFIG.get("resources", []):
+            self.record(key)
+
+    def finish_dependencies(self):
+        if not self.fixture_graph_valid:
+            for dependencies in self.fixture_dependencies.values():
+                self.shared_dependencies.update(dependencies)
+        for node, fixtures in self.fixture_consumers.items():
+            pending, seen = list(fixtures), set()
+            while pending:
+                fixture = pending.pop()
+                if fixture in seen:
+                    continue
+                seen.add(fixture)
+                self.tests[node]["dependencies"].update(self.fixture_dependencies.get(fixture, ()))
+                pending.extend(self.fixture_edges.get(fixture, ()))
+        # No observation is not evidence that a resource is irrelevant (e.g.
+        # stat or a native reader outside this collector's hooks).
+        observed = self.shared_dependencies.union(*(item["dependencies"] for item in self.tests.values()))
+        resources = {"file:" + name for name in CONFIG.get("resources", [])} if self.file_inputs else set()
+        self.shared_dependencies.update(resources - observed)
+        for item in self.tests.values():
+            item["dependencies"].update(self.shared_dependencies)
 
     def pytest_runtest_logstart(self, nodeid, location):
         self.active = nodeid
+        self.phase = "setup"
         self.tests[nodeid] = {"passed": False, "dependencies": set(), "phases": {}}
+        pending, seen = [nodeid.split("::")[0]], set()
+        while pending:
+            name = pending.pop()
+            if name in seen:
+                continue
+            seen.add(name)
+            key = self.file_inputs.get(str(self.root / name))
+            if key:
+                self.tests[nodeid]["dependencies"].add(key)
+            pending.extend(self.imports.get(name, ()))
 
     def pytest_runtest_logreport(self, report):
         self.tests[report.nodeid]["phases"][report.when] = report.outcome
+        self.phase = "call" if report.when == "setup" else "teardown"
 
     def pytest_runtest_logfinish(self, nodeid, location):
         phases = self.tests[nodeid]["phases"]
@@ -243,7 +424,31 @@ def worker(request_path):
     import pytest
 
     recorder = Recorder(root)
+    plugins = [recorder]
+    if CONFIG.get("fixture_tracking") == "consumers":
+
+        class FixtureGraph:
+            @pytest.hookimpl(hookwrapper=True)
+            def pytest_fixture_setup(self, fixturedef, request):
+                recorder.fixture_stack.append(fixturedef)
+                try:
+                    yield
+                finally:
+                    recorder.attach_fixture_edges(fixturedef, request)
+                    recorder.fixture_stack.pop()
+
+            @pytest.hookimpl(hookwrapper=True, tryfirst=True)
+            def pytest_runtest_teardown(self, item, nextitem):
+                recorder.attach_fixtures(item)
+                try:
+                    yield
+                finally:
+                    recorder.attach_fixtures(item)
+
+        plugins.append(FixtureGraph())
     if request.get("collect_dependencies", True):
+        recorder.enabled = True
+        sys.addaudithook(recorder.audit)
         sys.setprofile(recorder.profile)
         threading.setprofile(recorder.profile)
     try:
@@ -251,11 +456,13 @@ def worker(request_path):
             ["-p", "pytest_asyncio.plugin", "-o", "addopts=", "-q", "--tb=no", "--disable-warnings"]
             + CONFIG.get("pytest_args", [])
             + (request["selected"] if request["selected"] is not None else SUITES),
-            plugins=[recorder],
+            plugins=plugins,
         )
     finally:
+        recorder.enabled = False
         sys.setprofile(None)
         threading.setprofile(None)
+    recorder.finish_dependencies()
     for evidence in recorder.tests.values():
         evidence["dependencies"] = sorted(evidence["dependencies"])
     Path(request["output"]).write_text(
@@ -389,7 +596,7 @@ def main():
     parser.add_argument("output", type=Path)
     parser.add_argument("--baseline", type=Path)
     args = parser.parse_args()
-    configure(json.loads(args.config.read_text()))
+    configure(json.loads(args.config.read_text()), args.repository.resolve())
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     with tempfile.TemporaryDirectory(prefix="panthera-shadow-") as temp:
