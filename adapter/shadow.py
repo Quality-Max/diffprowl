@@ -34,6 +34,25 @@ def configure(config):
             raise ValueError("scope paths must be relative Python source files")
     if not TARGETS or not SUITES:
         raise ValueError("scope must contain targets and suites")
+    for name in config.get("resources", []):
+        path = Path(name)
+        if (
+            path.is_absolute()
+            or ".." in path.parts
+            or not path.parts
+            or any(part.startswith(".") for part in path.parts)
+            or path.suffix.lower() not in {".json", ".txt", ".html", ".csv"}
+        ):
+            raise ValueError("resources must be explicit relative non-hidden JSON, text, HTML or CSV files")
+
+
+def resource_file(root, name):
+    path = root / name
+    if any(part.is_symlink() for part in [path, *path.parents] if part != root and root in part.parents):
+        raise ValueError(f"resource must not use symlinks: {name}")
+    if not path.is_file():
+        raise ValueError(f"resource must exist as a regular file: {name}")
+    return path
 
 
 def digest(value):
@@ -77,15 +96,21 @@ def snapshot(root, engine):
     shared["runtime"] = [sys.version, platform.system(), platform.machine()]
     shared["packages"] = sorted((d.metadata["Name"] or "", d.version) for d in importlib.metadata.distributions())
     shared["adapter"] = digest(Path(__file__).read_bytes())
+    shared["resources"] = {name: digest(resource_file(root, name).read_bytes()) for name in CONFIG.get("resources", [])}
     return {"shared": digest(json.dumps(shared, sort_keys=True).encode()), "symbols": functions}
 
 
 def mirror(destination, repository):
     # Explicit source/config allowlist. No .env, credentials, logs, or artifacts.
     paths = subprocess.check_output(["git", "ls-files", "-z"], cwd=repository).decode().split("\0")
+    resources = CONFIG.get("resources", [])
+    for name in resources:
+        if name not in paths:
+            raise ValueError(f"resource must be Git-tracked: {name}")
+        resource_file(repository, name)
     for name in paths:
         path = Path(name)
-        if not name or (path.suffix != ".py" and name != "pytest.ini"):
+        if not name or (path.suffix != ".py" and name != "pytest.ini" and name not in resources):
             continue
         source = repository / path
         if source.is_symlink() or not source.is_file():
@@ -107,13 +132,22 @@ def child_environment(root):
     }
 
 
-def run_tests(root, output, selected=None):
+def run_tests(root, output, selected=None, collect_dependencies=True):
     if selected == []:
         return {"tests": {}, "exit_code": 0, "wall_seconds": 0, "cpu_seconds": 0}
     # Keep import filenames and the worker's canonical cwd identical on macOS.
     root = root.resolve()
     request = output.with_suffix(".request.json")
-    request.write_text(json.dumps({"selected": selected, "output": str(output), "config": CONFIG}))
+    request.write_text(
+        json.dumps(
+            {
+                "selected": selected,
+                "output": str(output),
+                "config": CONFIG,
+                "collect_dependencies": collect_dependencies,
+            }
+        )
+    )
     started = time.perf_counter()
     before = resource.getrusage(resource.RUSAGE_CHILDREN)
     completed = subprocess.run(
@@ -190,8 +224,9 @@ def worker(request_path):
     import pytest
 
     recorder = Recorder(root)
-    sys.setprofile(recorder.profile)
-    threading.setprofile(recorder.profile)
+    if request.get("collect_dependencies", True):
+        sys.setprofile(recorder.profile)
+        threading.setprofile(recorder.profile)
     try:
         code = pytest.main(
             ["-p", "pytest_asyncio.plugin", "-o", "addopts=", "-q", "--tb=no", "--disable-warnings"]
@@ -209,21 +244,72 @@ def worker(request_path):
     return int(code)
 
 
+# Matches the Rust evidence reader. Requests include both symbol inventories.
+MAX_PLAN_BYTES = 16 * 1024 * 1024
+
+
+def plan_shadow(current, baseline, directory, engine):
+    """Partition receipts by encoded size; never partition shared inputs/symbols."""
+
+    def encode(evidence):
+        return json.dumps({"schema": 1, **current, "baseline": evidence}, separators=(",", ":")).encode()
+
+    payloads = []
+
+    def partition(evidence):
+        payload = encode(evidence)
+        if len(payload) <= MAX_PLAN_BYTES:
+            payloads.append(payload)
+            return True
+        if evidence is None or len(evidence["tests"]) < 2:
+            return False
+        items = sorted(evidence["tests"].items())
+        middle = len(items) // 2
+        return all(partition({**evidence, "tests": dict(part)}) for part in (items[:middle], items[middle:]))
+
+    # Preflight all batches before invoking the planner. A single oversized receipt
+    # or shared inventory cannot be split safely: expand rather than drop evidence.
+    if not partition(baseline):
+        nodes = sorted(baseline["tests"]) if baseline else []
+        return {
+            "expand": True,
+            "selected": nodes,
+            "reasons": {node: "planner transport limit; full run required" for node in nodes},
+            "request_batches": 0,
+            "transport_fallback": "planner request cannot fit within 16 MiB",
+        }
+    plans = []
+    for index, payload in enumerate(payloads):
+        name = "plan-request.json" if len(payloads) == 1 else f"plan-request-{index}.json"
+        path = directory / name
+        path.write_bytes(payload)
+        plans.append(json.loads(subprocess.check_output([str(engine), "shadow-plan", str(path)])))
+    if len(plans) == 1:
+        return {**plans[0], "request_batches": 1}
+    if len({plan["expand"] for plan in plans}) != 1:
+        raise ValueError("inconsistent expansion across planner batches")
+    return {
+        "expand": plans[0]["expand"],
+        "selected": sorted(node for plan in plans for node in plan["selected"]),
+        "reasons": {node: reason for plan in plans for node, reason in plan["reasons"].items()},
+        "request_batches": len(plans),
+    }
+
+
 def compare(root, directory, engine, baseline, order):
     if baseline and any(not any(node.startswith(suite + "::") for suite in SUITES) for node in baseline["tests"]):
         raise ValueError("baseline contains tests outside the approved suite")
     started = time.perf_counter()
     current = snapshot(root, engine)
-    request = {"schema": 1, **current, "baseline": baseline}
-    request_path = directory / "plan-request.json"
-    request_path.write_text(json.dumps(request))
-    plan = json.loads(subprocess.check_output([str(engine), "shadow-plan", str(request_path)]))
+    plan = plan_shadow(current, baseline, directory, engine)
     planning_seconds = time.perf_counter() - started
     (directory / "plan.json").write_text(json.dumps(plan, indent=2))
     runs = {}
     for kind in order:
         selection = None if kind == "full" or plan["expand"] else plan["selected"]
-        runs[kind] = run_tests(root, directory / f"{kind}.json", selection)
+        # Only the full run supplies baseline dependencies. Selected runs still
+        # record every phase outcome, without paying for unused call profiling.
+        runs[kind] = run_tests(root, directory / f"{kind}.json", selection, collect_dependencies=kind == "full")
     full, selected = runs["full"], runs["selected"]
 
     def failures(run):

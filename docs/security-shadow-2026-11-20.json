@@ -1,0 +1,87 @@
+{
+  "scope": {
+    "marker": "not live",
+    "unit_modules": 921,
+    "selected_fault": "_is_internal_navigation_url returns False",
+    "single_samples": true
+  },
+  "comparison": {
+    "full_cases": 20117,
+    "selected_cases": 68,
+    "full_failures": 42,
+    "selected_failures": 42,
+    "baseline_failures": 0,
+    "missed_failures": [],
+    "phase_disagreements": [],
+    "inventory_matches": true,
+    "security_probe_passed_in_profile": true,
+    "security_probe_dependency_recorded": true,
+    "security_probe_selected_and_failed": true,
+    "request_batches": 2,
+    "matches_full": true
+  },
+  "runs": {
+    "profile": {
+      "kind": "profile",
+      "collected": 20117,
+      "deselected": 6,
+      "passed": 20111,
+      "failed": 0,
+      "skipped": 6,
+      "metrics": {
+        "wall_seconds": 803.5356601660023,
+        "cpu_seconds": 484.70285499999994,
+        "exit_code": 0
+      },
+      "end_to_end_seconds": 811.9496541249973
+    },
+    "full": {
+      "kind": "full",
+      "collected": 20117,
+      "deselected": 6,
+      "passed": 20069,
+      "failed": 42,
+      "skipped": 6,
+      "metrics": {
+        "wall_seconds": 609.2081065829989,
+        "cpu_seconds": 304.82762799999995,
+        "exit_code": 1
+      },
+      "end_to_end_seconds": 617.1957425410073
+    },
+    "selected": {
+      "kind": "selected",
+      "collected": 68,
+      "deselected": 0,
+      "passed": 20,
+      "failed": 42,
+      "skipped": 6,
+      "metrics": {
+        "wall_seconds": 9.538750749998144,
+        "cpu_seconds": 11.447447,
+        "exit_code": 1
+      },
+      "end_to_end_seconds": 18.345148209002218
+    }
+  },
+  "dependency_profile": {
+    "cases": 20117,
+    "consumers_of_mutated_function": 62,
+    "security_probe_dependency_recorded": true,
+    "distinct_dependencies": 7406,
+    "dependency_edges": 177566
+  },
+  "adapter_tests": 16,
+  "rust_tests": 20,
+  "ci_skipping_enabled": false,
+  "evidence_sha256": {
+    "validate.py": "3ddd1a7073c26f1930189b6aaeb3c00bed626d032917fa5f8344bccc41985d27",
+    "comparison.json": "c42b06a5bd3fda3dfdebc7bc144349478f22128b7b17b51e1193ab0eba073605",
+    "profile/results.json": "d7ceb5c5e831dd067f1c9133d2ae726b0917b157c08647bc3b99a5a4aeb5590f",
+    "full/results.json": "6d86c478f2b736c729587d2de8521a85a23afd838fa2e3a3a6051317d290bd87",
+    "selected/results.json": "e385fa6b4e2a24f216b6dfd179eacab6c6ad75a14e6eedde6b3e8d8962441155",
+    "profile/snapshot.json": "62145582579d30dcd33590633dbe069f20d60923af5bfcb319e3bd9c8e867c1d",
+    "full/snapshot.json": "f0b87d529da71a7d5b376dbb615dbb1686912ef569a253409b47c516e412bf57",
+    "selected/snapshot.json": "f0b87d529da71a7d5b376dbb615dbb1686912ef569a253409b47c516e412bf57"
+  }
+}
