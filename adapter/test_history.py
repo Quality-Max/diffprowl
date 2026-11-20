@@ -12,6 +12,55 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class HistoryTests(unittest.TestCase):
+    def test_invalid_base_stays_incomplete_and_export_preserves_executable(self):
+        for invalid in (True, False):
+            with self.subTest(invalid=invalid), TemporaryDirectory() as directory:
+                root = Path(directory)
+                repo = root / "repo"
+                repo.mkdir()
+
+                def git(*args):
+                    return subprocess.check_output(["git", *args], cwd=repo, text=True).strip()
+
+                def commit():
+                    git("add", ".")
+                    git("-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "fixture")
+                    return git("rev-parse", "HEAD")
+
+                git("init", "-q")
+                (repo / "service.py").write_text("def value(): return 1\n")
+                script = repo / "script.py"
+                script.write_text("#!/bin/sh\nexit 0\n")
+                script.chmod(0o755)
+                suite = repo / "test_value.py"
+                source = (
+                    "import subprocess\nfrom service import value\n"
+                    "def test_value():\n    assert value() == 1\n"
+                    "    assert subprocess.run(['./script.py']).returncode == 0\n"
+                )
+                suite.write_text("raise RuntimeError('collection')\n" if invalid else source.replace("== 1", "== 0"))
+                base = commit()
+                suite.write_text(source)
+                head = commit()
+                config = {"targets": ["service.py"], "suites": [suite.name]}
+                manifest = {
+                    "changes": [{"pr": 1, "base": base, "head": head, "category": "test", "paths": [suite.name]}],
+                    "pilot": [1],
+                    "wall_budget_seconds": 30,
+                    "worker_timeout_seconds": 10,
+                    "periodic_full_every": 3,
+                }
+                result = history.replay(repo, config, manifest, ROOT / "target/debug/panthera", root / "out")
+                full = json.loads((root / "out/1/full.json").read_text())
+                self.assertEqual(full["exit_code"], 0)
+                self.assertEqual(result["complete"], not invalid)
+                self.assertEqual(result["cost_projection_available"], not invalid)
+                trial = result["trials"][0]
+                self.assertFalse(trial["profile_eligible"])
+                self.assertTrue(trial["expand"])
+                if invalid:
+                    self.assertNotIn("cost_projection", trial)
+
     def test_replay_immutable_revisions_and_conservative_expansion(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

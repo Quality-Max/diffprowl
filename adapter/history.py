@@ -52,6 +52,7 @@ def capture(repository, revision, root, config):
             target = root / member.name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(source.extractfile(member).read())
+            target.chmod(0o755 if omitted[member.name][0] == "100755" else 0o644)
     if any(not (root / name).is_file() for name in paths):
         raise ValueError("archive omitted tracked inputs")
     resolved = a.discover(config, repository, paths)
@@ -143,9 +144,11 @@ def replay(repository, config, manifest, engine, output):
                 item["profile_cost"] = q.elapsed(profile_start)
                 try:
                     q.validate_run(profile)
-                    eligible = stable and profile["exit_code"] == 0
+                    profile_complete = stable
                 except q.QualificationError:
-                    eligible = False
+                    profile_complete = False
+                eligible = profile_complete and profile["exit_code"] == 0
+                item["profile_complete"] = profile_complete
                 item["profile_eligible"] = eligible
                 item["profile_failures"] = len(q.failures(profile))
                 a.configure(head_config)
@@ -211,6 +214,10 @@ def replay(repository, config, manifest, engine, output):
                     }
                 )
                 item["full_failures"] = len(q.failures(runs["full"]))
+                if not profile_complete:
+                    # Keep head observations, but an incomplete base profile
+                    # cannot become a completed trial or qualify economics.
+                    raise q.QualificationError("incomplete base profile")
                 item["complete"] = True
                 # Cold exact-base profile charged for EACH historical PR. No
                 # amortization across unrelated revisions or invented warm cache.

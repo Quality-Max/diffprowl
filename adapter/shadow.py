@@ -136,6 +136,11 @@ def snapshot(root, engine):
             if name in SUITES:
                 # Collection-time effects and inventory changes remain global.
                 shared["suite_structure:" + name] = symbols(path.read_text())[1]
+                shared["suite_hooks:" + name] = [
+                    ast.dump(node, include_attributes=False)
+                    for node in ast.walk(ast.parse(path.read_text()))
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("pytest_")
+                ]
             if CONFIG.get("input_tracking") == "files" and path.suffix == ".py" and path.name != "conftest.py":
                 functions["file:" + name] = digest(path.read_bytes())
             else:
@@ -282,6 +287,7 @@ class Recorder:
         self.shared_dependencies = set()
         self.fixture_stack = []
         self.fixture_dependencies = {}
+        self.fixture_edges = {}
         self.fixture_consumers = {}
         self.fixture_graph_valid = True
         self.phase = None
@@ -316,6 +322,17 @@ class Recorder:
             return
         self.fixture_consumers.setdefault(item.nodeid, set()).update(definitions.values())
 
+    def attach_fixture_edges(self, fixture, request):
+        # A dynamic lookup can reuse a primed producer without executing its
+        # body. Retain that definition edge for later cached wrapper consumers.
+        definitions = getattr(request, "_fixture_defs", None)
+        if not isinstance(definitions, dict):
+            self.fixture_graph_valid = False
+            return
+        self.fixture_edges.setdefault(fixture, set()).update(
+            value for value in definitions.values() if value is not fixture
+        )
+
     def profile(self, frame, event, _arg):
         if event != "call":
             return
@@ -346,8 +363,14 @@ class Recorder:
             for dependencies in self.fixture_dependencies.values():
                 self.shared_dependencies.update(dependencies)
         for node, fixtures in self.fixture_consumers.items():
-            for fixture in fixtures:
+            pending, seen = list(fixtures), set()
+            while pending:
+                fixture = pending.pop()
+                if fixture in seen:
+                    continue
+                seen.add(fixture)
                 self.tests[node]["dependencies"].update(self.fixture_dependencies.get(fixture, ()))
+                pending.extend(self.fixture_edges.get(fixture, ()))
         # No observation is not evidence that a resource is irrelevant (e.g.
         # stat or a native reader outside this collector's hooks).
         observed = self.shared_dependencies.union(*(item["dependencies"] for item in self.tests.values()))
@@ -411,6 +434,7 @@ def worker(request_path):
                 try:
                     yield
                 finally:
+                    recorder.attach_fixture_edges(fixturedef, request)
                     recorder.fixture_stack.pop()
 
             @pytest.hookimpl(hookwrapper=True, tryfirst=True)

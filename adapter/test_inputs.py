@@ -13,6 +13,40 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class InputsTests(unittest.TestCase):
+    def test_collection_hook_body_change_expands_for_added_parameter(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "service.py").write_text("def value(): return 1\n")
+            suite = root / "test_value.py"
+            source = (
+                "from service import value\n"
+                "def pytest_generate_tests(metafunc): metafunc.parametrize('n', [1, 2])\n"
+                "def test_value(n): assert value() == 1 and n < 3\n"
+            )
+            suite.write_text(source)
+            a.configure({"targets": ["service.py"], "suites": [suite.name], "input_tracking": "files"})
+            engine = ROOT / "target/debug/panthera"
+            before = a.snapshot(root, engine)
+            profile = a.run_tests(root, root / "profile.json")
+            q.validate_run(profile)
+            suite.write_text(source.replace("[1, 2]", "[1, 2, 3]"))
+            plan = a.plan_shadow(
+                a.snapshot(root, engine),
+                {
+                    **before,
+                    "tests": {
+                        node: {k: item[k] for k in ("passed", "dependencies")}
+                        for node, item in profile["tests"].items()
+                    },
+                },
+                root,
+                engine,
+            )
+            self.assertTrue(plan["expand"])
+            full = a.run_tests(root, root / "full.json", collect_dependencies=False)
+            self.assertEqual(len(full["tests"]), 3)
+            self.assertEqual(len(q.failures(full)), 1)
+
     def test_stratified_campaign_and_discovery(self):
         # Copy only this fixture to a fresh Git repository: no developer state.
         import shutil

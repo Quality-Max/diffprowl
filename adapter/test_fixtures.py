@@ -11,6 +11,47 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class FixtureConsumersTests(unittest.TestCase):
+    def test_primed_dynamic_cached_wrapper_retains_producer(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            service = root / "service.py"
+            service.write_text("def value(): return 1\n")
+            (root / "conftest.py").write_text(
+                "import pytest\nfrom service import value\n"
+                '@pytest.fixture(scope="session")\ndef producer(): return value()\n'
+                '@pytest.fixture(scope="session")\ndef wrapped(request):\n'
+                '    return request.getfixturevalue("producer")\n'
+            )
+            (root / "test_value.py").write_text(
+                "def test_prime(producer): assert producer == 1\n"
+                "def test_wrap(wrapped): assert wrapped == 1\n"
+                "def test_reuse(wrapped): assert wrapped == 1\n"
+            )
+            a.configure({"targets": [service.name], "suites": ["test_value.py"], "fixture_tracking": "consumers"})
+            engine = ROOT / "target/debug/panthera"
+            before = a.snapshot(root, engine)
+            profile = a.run_tests(root, root / "profile.json")
+            q.validate_run(profile)
+            for item in profile["tests"].values():
+                self.assertIn("service.py::value", item["dependencies"])
+            service.write_text("def value(): return 0\n")
+            plan = a.plan_shadow(
+                a.snapshot(root, engine),
+                {
+                    **before,
+                    "tests": {
+                        node: {k: item[k] for k in ("passed", "dependencies")}
+                        for node, item in profile["tests"].items()
+                    },
+                },
+                root,
+                engine,
+            )
+            selected = a.run_tests(root, root / "selected.json", plan["selected"], False)
+            full = a.run_tests(root, root / "full.json", collect_dependencies=False)
+            self.assertEqual(len(q.failures(full)), 3)
+            self.assertEqual(q.failures(full), q.failures(selected))
+
     def test_fixture_parameter_values_are_unioned(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

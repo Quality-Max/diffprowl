@@ -370,7 +370,8 @@ saved with evidence. Existing explicit scopes and default shared-input mode work
 
 In file mode, tests/helpers have individual file fingerprints. Static import closure
 connects helper consumers; explicit resource opens record file dependencies.
-Collection-time test structure and conftest remain shared. By default, fixture setup/teardown,
+Collection-time test structure, pytest hook bodies and conftest remain shared.
+By default, fixture setup/teardown,
 import-time calls and background-thread calls are attributed to every test in both
 modes, so cached values cannot lose their producer merely through fixture reuse.
 Imported helpers may therefore select more than their exact consumers.
@@ -405,7 +406,9 @@ or unqualified campaigns cannot produce a savings projection. Skipping stays off
 
 `"fixture_tracking": "consumers"` attributes observed fixture setup dependencies
 (including nested and dynamically requested fixtures) to all users of the cached
-fixture definition. The default is `"shared"`. Teardown, import-time and background
+fixture definition. A cached dynamic producer is linked to its wrapper even when
+the producer was already primed by another test. The default is `"shared"`.
+Teardown, import-time and background
 observations still stay shared. Parameter values are conservatively unioned per
 fixture definition. This mode uses pytest's private active-definition map; an
 absent map forces captured fixture dependencies to be shared. It is qualified only
@@ -427,7 +430,8 @@ and positive `wall_budget_seconds`, `worker_timeout_seconds`,
 
 It exports tracked Python, pytest.ini and explicitly approved resources from Git;
 other tracked inputs are represented by object IDs and modes, and any change to
-those inputs forces a full run. It never copies the dirty working tree. The scope
+those inputs forces a full run. Exported regular files preserve Git executable
+permissions. It never copies the dirty working tree. The scope
 is the declared suites plus up to five changed `tests/unit/test_*.py` files chosen
 lexicographically. Missing historical suite files are removed per revision; that
 scope drift invalidates reuse. This bounded policy is not whole-repository coverage.
@@ -436,7 +440,9 @@ Each change pays for its own exact-base profile, preparation and planning; the
 projection includes full fallbacks and periodic full runs. Both selected and full
 are actually executed for observation. It records current installed packages, not
 historical dependency environments. Collection errors and timeouts remain incomplete
-trials, never successful comparisons. The wall budget is checked between phases
+trials, never successful comparisons, including an incomplete base followed by a
+complete head. A complete but failing base instead forces a full fallback.
+The wall budget is checked between phases
 and bounds test workers; local archive/copy/planning phases are not hard-preempted.
 Raw application output is discarded. No projection is available for an incomplete
 campaign. No skipping or provider billing reduction is implied.
