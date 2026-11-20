@@ -219,6 +219,76 @@ additional performance baseline. Child CPU excludes snapshot/planning CPU.
 Single samples are not a speedup claim. Shadow mode itself costs more because it
 runs both selections. Peak memory, provider cost and CI billing are not measured.
 
+## Fault qualification campaigns
+
+`qualify` profiles a green baseline once, applies one declared mutation per trial,
+and compares selected tests with an unprofiled full scoped run. Every execution
+starts in a fresh temporary source copy. It does not edit the application's checkout.
+The release binary embeds the adapter; Python 3.11+, pytest, pytest-asyncio and the
+application's test dependencies must still be installed in the chosen interpreter.
+
+```sh
+target/release/panthera qualify . examples/pytest_demo/scope.json \
+  examples/pytest_demo/campaign.json artifacts/qualification \
+  --python .venv/bin/python --timeout 180
+```
+
+Run from a Git checkout with the example files tracked, and use a new output
+directory. The bundled campaign contains two function faults, an equivalent
+rewrite, a shared-fixture fault and a configuration fault. The latter two must
+expand to all tests. Application campaigns and scopes belong in that application's
+repository. A minimal campaign is:
+
+```json
+{
+  "schema": 1,
+  "trials": [{
+    "id": "total_fault",
+    "kind": "function_body",
+    "path": "examples/pytest_demo/service.py",
+    "symbol": "total",
+    "body": "return 0",
+    "expect": "detected",
+    "expect_expand": false
+  }]
+}
+```
+
+`function_body` replaces exactly one indexed function or class method while
+preserving its signature and the module's AST structure. `replace_text` instead
+requires exactly one matching `find` string and its `replace` string in a captured
+file; use it for fixture or resource faults. Patches are preflighted before profiling.
+Scope files can supply trusted `pytest_args`, such as `["-p", "pytest_mock"]` to
+enable a required plugin. These arguments are fingerprinted and apply to every run.
+
+A `detected` trial must fail the full suite; an `equivalent` trial must have no
+full-suite failures. Both must reproduce the full run's failure identities and
+phase outcomes, execute exactly their planned inventory, and match `expect_expand`.
+Omitted tests must pass in the full run. A timeout, collection error, missing
+receipt, changed inventory or source drift makes the trial incomplete. An incomplete
+trial records `missed_failures: null`; it cannot claim zero misses. Exit `0` means
+every trial qualified, `1` means a failed or incomplete campaign, and `2` means
+invalid CLI input or an unavailable output location.
+
+`report.json` contains trial verdicts, test reduction, fallback frequency and costs.
+`profile/` retains the baseline receipts. Each trial retains the plan, batched
+planner requests, selected/full receipts, mutation hashes and comparison. The root
+also retains scope, campaign, snapshots, adapter sources and revision/engine hashes.
+Evidence includes working-tree changes to tracked files; untracked source is excluded.
+
+Worker wall/CPU times exclude source copying, snapshots and planning. Role costs
+include copying and snapshots; planning, profiling and total campaign costs are
+reported separately. Selected/full order alternates across trials. These are single
+samples, not repeated performance benchmarks or measured CI/cloud savings. The
+campaign intentionally pays for profiling **and both runs** to qualify selection.
+Timeout cleanup signals the worker process group, but the adapter remains trusted
+local execution with accidental-network protection, not an OS sandbox. A green
+campaign establishes only the declared faults and scoped tests. **CI skipping
+remains disabled.**
+
+See the [initial qualification results](docs/qualification-2026-11-20.md) for the
+five example trials and three QualityMax faults against a 449-test scope.
+
 ## Relationship to 9lives
 
 Panthera owns selection and evidence-reuse decisions. 9lives owns browser execution

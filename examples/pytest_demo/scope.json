@@ -1,4 +1,11 @@
 {
-  "targets": ["examples/pytest_demo/service.py"],
-  "suites": ["examples/pytest_demo/test_service.py"]
+  "targets": [
+    "examples/pytest_demo/service.py"
+  ],
+  "suites": [
+    "examples/pytest_demo/test_service.py"
+  ],
+  "resources": [
+    "examples/pytest_demo/settings.json"
+  ]
 }

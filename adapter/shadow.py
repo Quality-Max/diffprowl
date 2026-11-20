@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import ast
+import contextlib
 import hashlib
 import importlib.metadata
 import json
@@ -11,6 +12,7 @@ import os
 import platform
 import resource
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -132,7 +134,7 @@ def child_environment(root):
     }
 
 
-def run_tests(root, output, selected=None, collect_dependencies=True):
+def run_tests(root, output, selected=None, collect_dependencies=True, timeout=180):
     if selected == []:
         return {"tests": {}, "exit_code": 0, "wall_seconds": 0, "cpu_seconds": 0}
     # Keep import filenames and the worker's canonical cwd identical on macOS.
@@ -150,22 +152,35 @@ def run_tests(root, output, selected=None, collect_dependencies=True):
     )
     started = time.perf_counter()
     before = resource.getrusage(resource.RUSAGE_CHILDREN)
-    completed = subprocess.run(
+    process = subprocess.Popen(
         [sys.executable, str(Path(__file__).resolve()), "worker", str(request)],
         cwd=root,
         env=child_environment(root),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        timeout=180,
-        check=False,
+        start_new_session=True,
     )
+    try:
+        code = process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(process.pid, signal.SIGTERM)
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
+        # The worker may exit while one of its children ignores SIGTERM.
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+        raise
     elapsed = time.perf_counter() - started
     after = resource.getrusage(resource.RUSAGE_CHILDREN)
     if not output.exists():
-        raise RuntimeError(f"isolated pytest worker did not produce evidence (exit {completed.returncode})")
+        raise RuntimeError(f"isolated pytest worker did not produce evidence (exit {code})")
     result = json.loads(output.read_text())
     result.update(
-        exit_code=completed.returncode,
+        exit_code=code,
         wall_seconds=elapsed,
         cpu_seconds=after.ru_utime + after.ru_stime - before.ru_utime - before.ru_stime,
     )
@@ -186,6 +201,7 @@ class Recorder:
         self.tests = {}
         self.active = None
         self.collection_errors = 0
+        self.collected = []
 
     def profile(self, frame, event, _arg):
         if event == "call" and self.active is not None and frame.f_code.co_filename in self.targets:
@@ -205,6 +221,9 @@ class Recorder:
         phases = self.tests[nodeid]["phases"]
         self.tests[nodeid]["passed"] = all(phases.get(p) == "passed" for p in ("setup", "call", "teardown"))
         self.active = None
+
+    def pytest_collection_finish(self, session):
+        self.collected = [item.nodeid for item in session.items]
 
     def pytest_collectreport(self, report):
         if report.failed:
@@ -230,6 +249,7 @@ def worker(request_path):
     try:
         code = pytest.main(
             ["-p", "pytest_asyncio.plugin", "-o", "addopts=", "-q", "--tb=no", "--disable-warnings"]
+            + CONFIG.get("pytest_args", [])
             + (request["selected"] if request["selected"] is not None else SUITES),
             plugins=[recorder],
         )
@@ -239,7 +259,10 @@ def worker(request_path):
     for evidence in recorder.tests.values():
         evidence["dependencies"] = sorted(evidence["dependencies"])
     Path(request["output"]).write_text(
-        json.dumps({"tests": recorder.tests, "collection_errors": recorder.collection_errors}, indent=2)
+        json.dumps(
+            {"tests": recorder.tests, "collection_errors": recorder.collection_errors, "collected": recorder.collected},
+            indent=2,
+        )
     )
     return int(code)
 
