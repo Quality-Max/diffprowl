@@ -47,9 +47,10 @@ def validate_campaign(campaign):
             raise QualificationError("unsupported mutation kind")
         if set(trial) != fields or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", trial["id"]):
             raise QualificationError("invalid mutation fields or id")
-        if trial["id"] == "profile" or trial["id"] in seen or trial["expect"] not in {"detected", "equivalent"}:
+        key = trial["id"].casefold()
+        if key == "profile" or key in seen or trial["expect"] not in {"detected", "equivalent"}:
             raise QualificationError("duplicate id or invalid expectation")
-        seen.add(trial["id"])
+        seen.add(key)
         path = Path(trial["path"])
         if path.is_absolute() or ".." in path.parts or path.as_posix() != trial["path"]:
             raise QualificationError("mutation path must be canonical and relative")

@@ -67,6 +67,22 @@ class VerdictTests(unittest.TestCase):
                     )
                     self.assertTrue(popen.call_args.kwargs["start_new_session"])
 
+    def test_interrupt_kills_and_reaps_detached_worker_group(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            a.configure({"targets": ["service.py"], "suites": ["test_service.py"]})
+            for cleanup in (0, subprocess.TimeoutExpired("worker", 5)):
+                with patch.object(a.subprocess, "Popen") as popen, patch.object(a.os, "killpg") as kill:
+                    process = popen.return_value
+                    process.pid = 12345
+                    process.wait.side_effect = [KeyboardInterrupt(), cleanup, 0]
+                    with self.assertRaises(KeyboardInterrupt):
+                        a.run_tests(root, root / "results.json", timeout=1)
+                    self.assertEqual(
+                        [call.args for call in kill.call_args_list], [(12345, signal.SIGTERM), (12345, signal.SIGKILL)]
+                    )
+                    self.assertEqual(process.wait.call_count, 3)
+
     def test_missed_failure_survivor_and_expansion_mismatch_fail(self):
         full = result({"test::f": FAIL, "test::g": PASS})
         selected = result({"test::g": PASS})
@@ -120,6 +136,7 @@ class VerdictTests(unittest.TestCase):
         for item in [
             trial(id="../escape"),
             trial(id="profile"),
+            trial(id="PROFILE"),
             trial(path="../service.py"),
             trial(path="/service.py"),
             trial(path="a//service.py"),
@@ -130,7 +147,7 @@ class VerdictTests(unittest.TestCase):
             with self.subTest(item=item), self.assertRaises((q.QualificationError, KeyError)):
                 q.validate_campaign({"schema": 1, "trials": [item]})
         with self.assertRaises(q.QualificationError):
-            q.validate_campaign({"schema": 1, "trials": [trial(), trial()]})
+            q.validate_campaign({"schema": 1, "trials": [trial(), trial(id="FAULT")]})
 
     def test_mutation_changes_exactly_one_method_and_rejects_ambiguous_or_noop(self):
         with TemporaryDirectory() as directory:

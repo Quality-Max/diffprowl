@@ -331,3 +331,20 @@ cargo clippy --locked --all-targets -- -D warnings
 
 Run `cargo test` before adapter tests: their end-to-end checks use the debug binary.
 The project is a private prototype; no public distribution license has been selected.
+
+## Pinned candidate builds
+
+`v0.2.0-rc.1` is a private prerelease for observation, with Linux x86-64
+(static musl) and macOS ARM64 assets. `panthera --version` identifies the build;
+`SHA256SUMS` and `build.json` record artifact hashes and the source commit.
+Consumers must pin both the release and the SHA-256 of their platform asset.
+The release does not enable CI test skipping or claim selected/full equivalence.
+
+Build macOS locally with `cargo build --release --locked`. The Linux build uses
+`rust:1.90.0-alpine3.22` at digest
+`sha256:b4b54b176a74db7e5c68fdfe6029be39a02ccbcfe72b6e5a3e18e2c61b57ae26`,
+with `musl-dev` installed, `--platform linux/amd64`, and
+`CARGO_TARGET_DIR=/source/target/linux-amd64`. Run `cargo build --release --locked`
+and `cargo test --locked` inside that builder. The builder image is pinned;
+Alpine package mirrors are not snapshotted, so these are identified artifacts
+rather than a claim of byte-for-byte reproducible builds.

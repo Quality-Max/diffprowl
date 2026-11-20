@@ -87,3 +87,18 @@ fn rejects_unknown_schema_and_empty_inventory() {
     input.symbols.clear();
     assert!(plan(input).is_err());
 }
+
+#[test]
+fn cli_reports_the_build_version() {
+    for flag in ["--version", "-V"] {
+        let result = std::process::Command::new(env!("CARGO_BIN_EXE_panthera"))
+            .arg(flag)
+            .output()
+            .unwrap();
+        assert!(result.status.success());
+        assert_eq!(
+            String::from_utf8(result.stdout).unwrap().trim(),
+            concat!("panthera ", env!("CARGO_PKG_VERSION"))
+        );
+    }
+}

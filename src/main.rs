@@ -61,6 +61,10 @@ with tempfile.TemporaryDirectory(prefix="panthera-adapter-") as directory:
 fn cli() -> Result<i32> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
+        Some("--version" | "-V") if args.len() == 1 => {
+            println!("panthera {}", env!("CARGO_PKG_VERSION"));
+            Ok(0)
+        }
         Some("qualify") => qualify(&args[1..]),
         Some("shadow-plan") if args.len() == 2 => {
             let request = read_json(Path::new(&args[1]))?;

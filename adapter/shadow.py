@@ -162,7 +162,7 @@ def run_tests(root, output, selected=None, collect_dependencies=True, timeout=18
     )
     try:
         code = process.wait(timeout=timeout)
-    except subprocess.TimeoutExpired:
+    except (subprocess.TimeoutExpired, KeyboardInterrupt):
         with contextlib.suppress(ProcessLookupError):
             os.killpg(process.pid, signal.SIGTERM)
         try:
