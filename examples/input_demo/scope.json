@@ -1,0 +1,14 @@
+{
+  "discover": {
+    "targets": [
+      "examples/input_demo/app"
+    ],
+    "suites": [
+      "examples/input_demo/tests"
+    ]
+  },
+  "input_tracking": "files",
+  "resources": [
+    "examples/input_demo/settings.json"
+  ]
+}
