@@ -186,7 +186,11 @@ Python paths in your own scope JSON. An optional `test_environment` map supplies
 non-sensitive test flags only; never put credentials in this file.
 
 The adapter copies Git-tracked Python files and root `pytest.ini`, including their
-working-tree changes. Untracked files and other assets/configuration are excluded.
+working-tree changes. Optional `resources` lists explicit, reviewed, non-sensitive
+JSON, text, HTML or CSV files needed by tests (for example, a runtime version
+manifest). Listed resources must be tracked regular files without symlinks; missing
+files fail before execution. Review their contents before inclusion: extensions
+do not establish that a file is safe. Hidden paths are rejected. Other assets are excluded.
 It strips the inherited environment and blocks common Python socket operations.
 This is accidental-network protection, **not an OS sandbox**: subprocesses and
 native extensions can bypass it. Run only trusted local code and mocked tests.
@@ -194,10 +198,12 @@ No live services or production credentials are required for the included example
 
 Function bodies have individual AST fingerprints. Module structure, signatures,
 decorators, all other copied Python source, scope configuration, installed package
-versions, Python/platform, adapter source, and engine executable are shared inputs.
+versions, Python/platform, adapter source, resource contents, and engine executable are shared inputs.
 A shared change expands execution to the whole suite. No dependency observation,
 failed/skipped receipt, or unknown dependency means rerun. A complete full run
 supplies the next baseline; failed receipts are retained but never reused.
+Only the full run profiles call dependencies. Selected runs record phase outcomes
+without profiling, because their dependencies never populate the baseline.
 
 The comparison checks test inventory, execution completion, collection errors,
 failing-test identities, and per-phase outcomes. Exit 0 requires agreement and a
@@ -208,6 +214,8 @@ local JSON, not signed attestations. **There is no CI-skipping switch.**
 
 `report.json` records planning time, subprocess wall time and child CPU time.
 Selected total includes planning; source copying and build time are excluded.
+Full-run timings include dependency profiling, so use ordinary pytest as an
+additional performance baseline. Child CPU excludes snapshot/planning CPU.
 Single samples are not a speedup claim. Shadow mode itself costs more because it
 runs both selections. Peak memory, provider cost and CI billing are not measured.
 
@@ -222,6 +230,23 @@ No LLM is used by the Rust engine or pytest adapter.
 The simulation is a bounded model, not a production digital twin. Real payment
 providers, adversarial security coverage, database transactions, model changes,
 and live network failure behavior have not been qualified.
+
+### Large shadow plans
+
+The Python adapter automatically partitions baseline test receipts by encoded byte
+size to respect the Rust reader's 16 MiB artifact limit. Every batch retains the
+complete current/baseline symbol inventories and shared fingerprints. Requests
+and the combined plan are saved for review; `request_batches` records their count.
+Preflight retains evidence references; each request is encoded and released
+individually so serialized symbol inventories do not accumulate across batches.
+If a single receipt or the shared inventories cannot fit, the plan expands to a
+full run with an explicit `transport_fallback` reason. Planner errors abort the
+comparison; no partial plan is used. Cold and empty baselines still expand.
+This transport support does not enable CI skipping: shadow comparisons execute
+both selected and full suites.
+
+See the [security-inclusive shadow validation](docs/security-shadow-2026-11-20.md)
+for a bounded whole-suite experiment and its execution limits.
 
 ## Development
 
