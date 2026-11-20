@@ -1,0 +1,65 @@
+name: Publish approved site
+
+# The repository is private; the GitHub Pages site is public. Publication is
+# therefore a deliberate act: a designated approver dispatches this workflow
+# for one exact, reviewed main commit. Only the curated site/ directory is
+# uploaded. Nothing else in the repository is ever served.
+
+on:
+  workflow_dispatch:
+    inputs:
+      approved_commit:
+        description: Full main commit reviewed and approved for public publication
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require the designated approver and exact main commit
+        env:
+          ACTOR: ${{ github.actor }}
+          APPROVER: ${{ vars.QMAX_DOCS_APPROVER }}
+          REF: ${{ github.ref }}
+          COMMIT: ${{ github.sha }}
+          APPROVED_COMMIT: ${{ inputs.approved_commit }}
+        run: |
+          test "$REF" = refs/heads/main
+          test -n "$APPROVER"
+          test "$ACTOR" = "$APPROVER"
+          test "$APPROVED_COMMIT" = "$COMMIT"
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Publish only regular files from the curated site directory
+        run: |
+          test -f site/index.html
+          test -z "$(find site -type l)"
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
+        with:
+          path: site
+          retention-days: 1
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish the approved artifact
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
