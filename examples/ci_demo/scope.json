@@ -1,0 +1,7 @@
+{
+  "targets": ["examples/ci_demo/failure_source.py", "examples/ci_demo/worker.py"],
+  "suites": ["examples/ci_demo/test_landing.py", "examples/ci_demo/test_worker.py"],
+  "resources": ["examples/ci_demo/landing.html"],
+  "input_tracking": "files",
+  "fixture_tracking": "consumers"
+}
