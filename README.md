@@ -210,7 +210,7 @@ failing-test identities, and per-phase outcomes. Exit 0 requires agreement and a
 passing full run. A report that finds no missed failures with `complete: false`
 is inconclusive. Historical observations do not prove new paths, reflection,
 thread attribution, native code, or cross-test effects safe. Receipts are trusted
-local JSON, not signed attestations. **There is no CI-skipping switch.**
+local JSON, not signed attestations. Shadow runs always retain the full comparison.
 
 `report.json` records planning time, subprocess wall time and child CPU time.
 Selected total includes planning; source copying and build time are excluded.
@@ -218,6 +218,57 @@ Full-run timings include dependency profiling, so use ordinary pytest as an
 additional performance baseline. Child CPU excludes snapshot/planning CPU.
 Single samples are not a speedup claim. Shadow mode itself costs more because it
 runs both selections. Peak memory, provider cost and CI billing are not measured.
+
+## Opt-in pytest CI selection
+
+`adapter/pytest_ci.py` applies a trusted Panthera plan in ordinary pytest and
+pytest-xdist jobs. Enable it for a reviewed content file whose tests have been
+qualified in the application repository. The application CI owns the baseline,
+plan generation, path allowlist, and schedule for full comparisons.
+
+Run from the application's Git root with the same pytest configuration,
+arguments, interpreter, and dependencies used by the green baseline. Use an
+external artifact directory and the `--option=value` form to keep artifact paths
+out of pytest's root directory inference:
+
+```sh
+PYTHONPATH="/path/to/panthera/adapter${PYTHONPATH:+:$PYTHONPATH}" \
+  python -m pytest -p pytest_ci \
+  --panthera-plan=/ci-artifacts/panthera-plan.json \
+  --panthera-select-path=static/landing.html \
+  --panthera-receipt=/ci-artifacts/panthera-execution.json
+```
+
+CI wraps the engine's `selected` and `expand` fields in a JSON object with
+`schema: 1`, `head_commit` and `baseline_commit` as full 40-character Git SHAs,
+and `baseline_tests` as the exact node ID inventory of its verified green,
+complete full run. Include `planning_seconds` if measured. Keep the plan in a
+trusted CI artifact and verify the profiling context when generating it.
+
+The plugin preserves ordinary pytest collection and applies the subset only
+when the checkout is clean, the tree diff from the ancestor baseline is a
+single content edit to the allowed tracked file, and the collected inventory
+matches the baseline. Missing, invalid, stale, expanded, and out-of-scope plans
+fall back to the original pytest invocation. An empty or full-size selection
+also falls back. Keep application-level full audit runs active.
+
+The execution receipt reports selected or full mode, the fallback reason,
+counts of collected, scheduled, attempted, and failed tests,
+pytest's exit code, validation time, pytest wall time, and supplied planning
+time. Collection failures can produce an incomplete receipt. A job supplying
+only `--panthera-receipt` records an ordinary full comparison. Use fresh jobs
+with the same inputs and account for planning and baseline maintenance when
+measuring CI savings.
+
+The [bundled CI demo](examples/ci_demo) exercises attribution of a landing HTML
+read in a function-scoped fixture alongside a session-scoped autouse fixture.
+Its campaign also seeds two faults that would allow an earlier transient error
+to mask a later permanent error, one in the worker and one in its dependency:
+
+```sh
+target/release/panthera qualify . examples/ci_demo/scope.json \
+  examples/ci_demo/campaign.json artifacts/ci-demo --python .venv/bin/python
+```
 
 ## Fault qualification campaigns
 

@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "trials": [
+    {
+      "id": "landing_heading",
+      "kind": "replace_text",
+      "stratum": "resource",
+      "path": "examples/ci_demo/landing.html",
+      "find": "<h1>QA Wiki</h1>",
+      "replace": "<h1>Wrong heading</h1>",
+      "expect": "detected",
+      "expect_expand": false
+    },
+    {
+      "id": "worker_masks_permanent_error",
+      "kind": "replace_text",
+      "stratum": "function",
+      "path": "examples/ci_demo/worker.py",
+      "find": "        except UnsupportedModel:\n            raise\n",
+      "replace": "",
+      "expect": "detected",
+      "expect_expand": false
+    },
+    {
+      "id": "dependency_raises_retryable_error",
+      "kind": "replace_text",
+      "stratum": "function",
+      "path": "examples/ci_demo/failure_source.py",
+      "find": "raise UnsupportedModel(\"embedding model is unavailable\")",
+      "replace": "raise ConnectionError(\"embedding model is unavailable\")",
+      "expect": "detected",
+      "expect_expand": false
+    }
+  ]
+}
