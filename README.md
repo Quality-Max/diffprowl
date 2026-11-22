@@ -339,7 +339,7 @@ Releases are produced only by `.github/workflows/release.yml`, triggered by a
 `v*` tag on `main` whose version matches `Cargo.toml` and has a `CHANGELOG.md`
 section. It runs the CI checks, builds a static x86-64 musl binary in
 `rust:1.94.1-alpine3.22` (pinned by digest, `--platform linux/amd64`) and a
-macOS arm64 binary on `macos-14`, then uploads them with `SHA256SUMS` and a
+macOS arm64 binary on `macos-15`, then uploads them with `SHA256SUMS` and a
 schema 2 `build.json` naming the workflow run, toolchain and builder. Existing
 releases are never overwritten. `panthera --version` identifies the build.
 
