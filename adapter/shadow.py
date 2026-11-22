@@ -478,11 +478,11 @@ def worker(request_path):
 MAX_PLAN_BYTES = 16 * 1024 * 1024
 
 
-def plan_shadow(current, baseline, directory, engine):
+def plan_shadow(current, baseline, directory, engine, *, schema=1):
     """Partition receipts by encoded size; never partition shared inputs/symbols."""
 
     def encode(evidence):
-        return json.dumps({"schema": 1, **current, "baseline": evidence}, separators=(",", ":")).encode()
+        return json.dumps({"schema": schema, **current, "baseline": evidence}, separators=(",", ":")).encode()
 
     batches = []
 
@@ -509,17 +509,23 @@ def plan_shadow(current, baseline, directory, engine):
             "transport_fallback": "planner request cannot fit within 16 MiB",
         }
     plans = []
+    deadline = time.monotonic() + 60
     for index, evidence in enumerate(batches):
         name = "plan-request.json" if len(batches) == 1 else f"plan-request-{index}.json"
         path = directory / name
         path.write_bytes(encode(evidence))
-        plans.append(json.loads(subprocess.check_output([str(engine), "shadow-plan", str(path)])))
+        command = [str(engine), "shadow-plan", str(path)]
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("planner exceeded its time budget")
+        output = subprocess.check_output(command, timeout=remaining, stderr=subprocess.DEVNULL)
+        plans.append(json.loads(output))
     if len(plans) == 1:
         return {**plans[0], "request_batches": 1}
-    if len({plan["expand"] for plan in plans}) != 1:
+    if len({(plan["expand"], plan.get("expand_reason")) for plan in plans}) != 1:
         raise ValueError("inconsistent expansion across planner batches")
     return {
-        "expand": plans[0]["expand"],
+        **plans[0],
         "selected": sorted(node for plan in plans for node in plan["selected"]),
         "reasons": {node: reason for plan in plans for node, reason in plan["reasons"].items()},
         "request_batches": len(plans),
