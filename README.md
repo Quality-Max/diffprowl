@@ -330,29 +330,33 @@ cargo clippy --locked --all-targets -- -D warnings
 ```
 
 Run `cargo test` before adapter tests: their end-to-end checks use the debug binary.
-The project is a private prototype; no public distribution license has been selected.
+The project is a private prototype; see [LICENSE](LICENSE). CI runs these same checks on every
+pull request (`.github/workflows/ci.yml`).
 
 ## Pinned candidate builds
 
-`v0.2.0-rc.1` is a private prerelease for observation, with Linux x86-64
-(static musl) and macOS ARM64 assets. `panthera --version` identifies the build;
-`SHA256SUMS` and `build.json` record artifact hashes and the source commit.
-Consumers must pin both the release and the SHA-256 of their platform asset.
-The release does not enable CI test skipping or claim selected/full equivalence.
+Releases are produced only by `.github/workflows/release.yml`, triggered by a
+`v*` tag on `main` whose version matches `Cargo.toml` and has a `CHANGELOG.md`
+section. It runs the CI checks, builds a static x86-64 musl binary in
+`rust:1.94.1-alpine3.22` (pinned by digest, `--platform linux/amd64`) and a
+macOS arm64 binary on `macos-14`, then uploads them with `SHA256SUMS` and a
+schema 2 `build.json` naming the workflow run, toolchain and builder. Existing
+releases are never overwritten. `panthera --version` identifies the build.
 
-Build macOS locally with `cargo build --release --locked`. The Linux build uses
-`rust:1.90.0-alpine3.22` at digest
-`sha256:b4b54b176a74db7e5c68fdfe6029be39a02ccbcfe72b6e5a3e18e2c61b57ae26`,
-with `musl-dev` installed, `--platform linux/amd64`, and
-`CARGO_TARGET_DIR=/source/target/linux-amd64`. Run `cargo build --release --locked`
-and `cargo test --locked` inside that builder. The builder image is pinned;
-Alpine package mirrors are not snapshotted, so these are identified artifacts
-rather than a claim of byte-for-byte reproducible builds.
+Consumers must pin both the release and the SHA-256 of their platform asset,
+and should check that the asset uploader is `github-actions[bot]` and that
+`build.json` names this workflow and the tagged commit. Signed artifact
+attestations need a public repository or GitHub Enterprise Cloud, so none are
+produced. Alpine package mirrors are not snapshotted: these are identified
+artifacts, not byte-for-byte reproducible builds.
+
+`v0.2.0-rc.1` was built manually before this workflow existed. Releases do not
+enable CI test skipping or claim selected/full equivalence.
 
 ## Dependency inputs and roadmap
 
-The following adapter features are unreleased development work; they are not
-included in the published `v0.2.0-rc.1` artifact.
+The following adapter features ship from `v0.2.0-rc.2`; they were not included
+in the manually built `v0.2.0-rc.1` artifact.
 
 See [the roadmap](docs/ROADMAP.md) for evidence gates, CI economics, additional
 languages, production fault contracts and the separate 9lives integration.
