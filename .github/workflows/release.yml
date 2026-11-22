@@ -1,0 +1,171 @@
+name: Release
+
+# A version tag on main produces the only binaries consumers may pin. The
+# assets are built and uploaded by this workflow run, never by hand, and
+# build.json records which run produced them.
+#
+# Signed artifact attestations (actions/attest-build-provenance) require a
+# public repository or GitHub Enterprise Cloud; this private repository is on
+# the Team plan. Consumers verify instead that each asset was uploaded by
+# github-actions[bot], that its SHA-256 matches SHA256SUMS and build.json, and
+# that build.json names this workflow, the tag and the source commit.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: 1.94.1
+  # rust:1.94.1-alpine3.22, pinned by digest. Static musl, as for earlier releases.
+  LINUX_BUILDER: rust@sha256:797631f9efd6957d0013f200e410478c380907eee3b469c6f80d89022df28bc7
+
+jobs:
+  verify:
+    name: verify tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Tag must match Cargo.toml and point into main
+        id: version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)
+          test "v$version" = "$TAG" || { echo "tag $TAG does not match Cargo.toml version $version"; exit 1; }
+          git fetch --no-tags origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "tagged commit is not on main"; exit 1; }
+          grep -q "^## \[$version\]" CHANGELOG.md || { echo "CHANGELOG.md has no [$version] section"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  checks:
+    needs: verify
+    uses: ./.github/workflows/ci.yml
+
+  build-linux:
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Build static x86_64 musl binary
+        run: |
+          docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src "$LINUX_BUILDER" \
+            sh -ec 'apk add --no-cache musl-dev >/dev/null && cargo build --release --locked && ./target/release/panthera --version'
+          mkdir -p dist
+          cp target/release/panthera dist/panthera-linux-x86_64
+          file dist/panthera-linux-x86_64 | grep -q 'statically linked'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: panthera-linux-x86_64
+          path: dist/panthera-linux-x86_64
+          if-no-files-found: error
+          retention-days: 7
+
+  build-macos:
+    needs: checks
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Build arm64 binary
+        run: |
+          rustup toolchain install "$RUST_TOOLCHAIN" --profile minimal
+          rustup default "$RUST_TOOLCHAIN"
+          test "$(uname -m)" = arm64
+          cargo build --release --locked
+          ./target/release/panthera --version
+          mkdir -p dist
+          cp target/release/panthera dist/panthera-darwin-arm64
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: panthera-darwin-arm64
+          path: dist/panthera-darwin-arm64
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: [verify, build-linux, build-macos]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Write SHA256SUMS and build.json
+        env:
+          TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: |
+          cd dist
+          chmod 0755 panthera-*
+          sha256sum panthera-darwin-arm64 panthera-linux-x86_64 > SHA256SUMS
+          python3 - <<'EOF'
+          import hashlib, json, os
+          def sha(name):
+              return hashlib.sha256(open(name, "rb").read()).hexdigest()
+          build = {
+              "schema": 2,
+              "repository": os.environ["REPOSITORY"],
+              "tag": os.environ["TAG"],
+              "source_commit": os.environ["GITHUB_SHA"],
+              "assets": {
+                  "linux-x86_64": {"name": "panthera-linux-x86_64", "sha256": sha("panthera-linux-x86_64")},
+                  "darwin-arm64": {"name": "panthera-darwin-arm64", "sha256": sha("panthera-darwin-arm64")},
+              },
+              "builder": {
+                  "workflow_ref": os.environ["WORKFLOW_REF"],
+                  "run_id": int(os.environ["RUN_ID"]),
+                  "run_attempt": int(os.environ["RUN_ATTEMPT"]),
+                  "run_url": os.environ["RUN_URL"],
+                  "rust_toolchain": os.environ["RUST_TOOLCHAIN"],
+                  "linux_builder": os.environ["LINUX_BUILDER"],
+                  "linux_builder_prerequisite": "musl-dev (Alpine mirror, not snapshotted)",
+                  "macos_runner": "macos-14",
+              },
+              "attestation": "unavailable: private repository on the GitHub Team plan",
+          }
+          json.dump(build, open("build.json", "w"), indent=2, sort_keys=True)
+          open("build.json", "a").write("\n")
+          EOF
+          cat SHA256SUMS
+      - name: Create release and upload assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: |
+          flags=""
+          case "$VERSION" in *-*) flags="--prerelease" ;; esac
+          # Never replace assets of an existing release: a tag is built once.
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "release $TAG already exists; refusing to overwrite its assets"; exit 1
+          fi
+          gh release create "$TAG" -R "$GITHUB_REPOSITORY" --verify-tag $flags \
+            --title "Panthera $TAG" \
+            --notes "Built by $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. See CHANGELOG.md and build.json." \
+            dist/panthera-linux-x86_64 dist/panthera-darwin-arm64 dist/SHA256SUMS dist/build.json
