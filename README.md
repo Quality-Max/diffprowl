@@ -352,6 +352,34 @@ The simulation is a bounded model, not a production digital twin. Real payment
 providers, adversarial security coverage, database transactions, model changes,
 and live network failure behavior have not been qualified.
 
+### Planner request schemas
+
+`shadow-plan` accepts schema 1 with its existing string keys and response fields.
+Schema 2 keeps the same request shape and adds explicit keys in `symbols` and
+test `dependencies`. Use `function:<id>`, `file:<path>`, `directory:<path>`,
+`closure:<id>`, `module:<path>`, `session`, or `unobserved`. `directory:`
+represents the repository root. Use unique map keys and nonblank fingerprints
+in both inventories, including the shared fingerprint. Unknown key kinds or
+blank fingerprints reject a schema 2 request.
+
+Schema 2 can reuse existing evidence when a function key is added. Changes to
+the values of existing keys and removals of function, file or directory keys
+select the tests that depended on those keys. A removed module, other key-set
+changes, missing or empty evidence, or a changed shared fingerprint expand
+the plan. A failed test or a receipt with empty or unknown dependencies is
+always selected. Collectors must fingerprint binding, discovery and runtime
+changes that can affect previous tests, even when a function addition itself
+is harmless. To detect unobserved module removals, include the full module
+inventory independently of observed test dependencies.
+
+An expanded schema 2 result includes one `expand_reason` code in priority
+order: `no_baseline`, `shared_input_changed`, `removed_module`,
+`inventory_changed`, or `empty_baseline`. Successful bounded plans omit
+`expand_reason`. Callers must run the full current inventory on expansion,
+including tests absent from the baseline. They must check current test
+collection before using any bounded plan. The bundled shadow adapter still
+uses schema 1.
+
 ### Large shadow plans
 
 The Python adapter automatically partitions baseline test receipts by encoded byte
