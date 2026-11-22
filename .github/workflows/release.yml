@@ -46,8 +46,8 @@ jobs:
         run: |
           version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)
           test "v$version" = "$TAG" || { echo "tag $TAG does not match Cargo.toml version $version"; exit 1; }
-          git fetch --no-tags origin main
-          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || { echo "tagged commit is not on main"; exit 1; }
+          # The full checkout already fetched main without persisting credentials.
+          git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main || { echo "tagged commit is not on main"; exit 1; }
           grep -q "^## \[$version\]" CHANGELOG.md || { echo "CHANGELOG.md has no [$version] section"; exit 1; }
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
@@ -69,7 +69,7 @@ jobs:
             sh -ec 'apk add --no-cache musl-dev >/dev/null && cargo build --release --locked && ./target/release/panthera --version'
           mkdir -p dist
           cp target/release/panthera dist/panthera-linux-x86_64
-          file dist/panthera-linux-x86_64 | grep -q 'statically linked'
+          LC_ALL=C file -b dist/panthera-linux-x86_64 | grep -Eq 'statically linked|static-pie linked'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: panthera-linux-x86_64
@@ -79,7 +79,7 @@ jobs:
 
   build-macos:
     needs: checks
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -145,7 +145,7 @@ jobs:
                   "rust_toolchain": os.environ["RUST_TOOLCHAIN"],
                   "linux_builder": os.environ["LINUX_BUILDER"],
                   "linux_builder_prerequisite": "musl-dev (Alpine mirror, not snapshotted)",
-                  "macos_runner": "macos-14",
+                  "macos_runner": "macos-15",
               },
               "attestation": "unavailable: private repository on the GitHub Team plan",
           }
