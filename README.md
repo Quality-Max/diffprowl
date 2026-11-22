@@ -352,6 +352,65 @@ The simulation is a bounded model, not a production digital twin. Real payment
 providers, adversarial security coverage, database transactions, model changes,
 and live network failure behavior have not been qualified.
 
+### Observe an existing pytest CI job
+
+`adapter/pytest_observer.py` compares native schema 2 plans with the results of
+an ordinary full pytest run. It supports pytest-cov test contexts and xdist.
+It records test IDs, phase outcomes and dependencies on tracked code, imports
+and filesystem inputs. The elapsed planning and export times are distinct from
+the cost of running or profiling pytest. The full pytest command retains its
+original exit status and runs without applying the plan.
+
+Use a checked-out, pinned Panthera source revision with its `adapter/` directory
+and a matching schema 2 binary. Install pytest-cov in the job's Python environment.
+In the application, commit an observer JSON such as `{"discover_roots":["src"]}`
+or `{"targets":["app.py"]}`. Run from the Git root with pytest's rootdir set to
+that same path. Substitute the job's ordinary pytest arguments and add the
+observer and coverage options to both invocations:
+
+```sh
+# Bash, run from the application Git root.
+export PYTHONPATH="$PANTHERA_SRC/adapter${PYTHONPATH:+:$PYTHONPATH}"
+output=.context/panthera-unit
+mkdir -p "$output"
+options=(--config ci/panthera-unit.json --output "$output"
+         --engine "$PANTHERA_BIN" --engine-sha256 "$PANTHERA_SHA256")
+suite=(tests/unit/ --rootdir="$PWD" --cov=src)
+observed=("${suite[@]}" --cov-context=test -p pytest_observer --panthera-output "$output")
+if python -m pytest_observer "${options[@]}" prepare -- "${observed[@]}"; then
+    if COVERAGE_FILE="$PWD/$output/.coverage" python -m pytest "${observed[@]}"; then
+        status=0
+    else
+        status=$?
+    fi
+    python -m pytest_observer "${options[@]}" finish --pytest-exit "$status" || true
+    exit "$status"
+fi
+exec python -m pytest "${suite[@]}"
+```
+
+Keep each job's coverage, observer artifacts and baseline in job-specific storage
+outside tracked files. The observer uses a fresh `.coverage` file in the output
+directory on each run. Use explicit pytest arguments and plugin flags in place of
+`PYTEST_ADDOPTS`, `PYTEST_PLUGINS`, and coverage append mode. Use standard tracked
+root-level pytest and coverage configuration files. A trusted CI wrapper may
+copy `baseline-candidate.json.gz` from a clean passing run with complete receipts
+to `baseline.json.gz` for the same suite on a descendant commit. The observer
+checks the engine checksum and ancestor relationship, fingerprints the pytest
+arguments and verifies the observed invocation. Candidate validation and
+publication policy stay with the app's CI.
+Older QualityMax observer baselines use a different receipt format and require a
+fresh full run. No install, release lookup or baseline upload is performed by this
+adapter.
+
+Use `report.json` to see the observed test count, advisory plan, expansion reason,
+and failures the bounded plan omitted. Collection drift expands the plan to the
+actual collection. An incomplete comparison reports omissions as unknown.
+Coverage, static imports and Python audit hooks have limits, including native or
+subprocess activity and dynamic lookup. Qualify each job against its own full runs
+before using the plans for anything beyond observation. Keep credentials out of
+test IDs, tracked input paths and observer configuration.
+
 ### Planner request schemas
 
 `shadow-plan` accepts schema 1 with its existing string keys and response fields.
@@ -377,8 +436,8 @@ order: `no_baseline`, `shared_input_changed`, `removed_module`,
 `inventory_changed`, or `empty_baseline`. Successful bounded plans omit
 `expand_reason`. Callers must run the full current inventory on expansion,
 including tests absent from the baseline. They must check current test
-collection before using any bounded plan. The bundled shadow adapter still
-uses schema 1.
+collection before using any bounded plan. The comparison adapter in
+`adapter/shadow.py` uses schema 1. The CI observer uses schema 2.
 
 ### Large shadow plans
 

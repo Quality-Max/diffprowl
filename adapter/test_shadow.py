@@ -223,7 +223,10 @@ class AdapterTests(unittest.TestCase):
         limit = 1_001_000
         retained = []
 
-        def planner(args):
+        def planner(args, *, timeout, stderr):
+            self.assertGreater(timeout, 0)
+            self.assertLessEqual(timeout, 60)
+            self.assertEqual(stderr, shadow.subprocess.DEVNULL)
             retained.append(tracemalloc.get_traced_memory()[0])
             self.assertLessEqual(Path(args[-1]).stat().st_size, limit)
             return b'{"expand": false, "selected": [], "reasons": {}}'
