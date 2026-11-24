@@ -1,4 +1,4 @@
-"""Observe input dependencies and compare a Panthera plan with full pytest.
+"""Observe input dependencies and compare a DiffProwl plan with full pytest.
 
 Run prepare before pytest and finish after it. This plugin leaves collection and
 execution unfiltered. Receipts retain test IDs, phases and tracked input paths.
@@ -597,7 +597,7 @@ class Recorder:
         phases[report.when] = report.outcome
 
     def pytest_sessionfinish(self, session, exitstatus):
-        output = Path(session.config.getoption("panthera_output"))
+        output = Path(session.config.getoption("diffprowl_output"))
         try:
             self.save(output, exitstatus, session.config)
         except Exception:
@@ -821,7 +821,7 @@ class InputRecorder:
 
     def pytest_sessionfinish(self, session):
         self.active = False
-        output = Path(session.config.getoption("panthera_output"))
+        output = Path(session.config.getoption("diffprowl_output"))
 
         def plain(value):
             return {key: sorted(item) if isinstance(item, set) else item for key, item in value.items()}
@@ -844,16 +844,16 @@ class InputRecorder:
 
 
 def pytest_addoption(parser):
-    parser.addoption("--panthera-output", default=str(DEFAULT_OUTPUT))
+    parser.addoption("--diffprowl-output", "--panthera-output", default=str(DEFAULT_OUTPUT))
 
 
 def pytest_configure(config):
     workerinput = getattr(config, "workerinput", None)
     if workerinput is None:
-        config.pluginmanager.register(Recorder(), "panthera-receipts")
+        config.pluginmanager.register(Recorder(), "diffprowl-receipts")
     recorder = InputRecorder(config.rootpath, workerinput["workerid"] if workerinput else "main")
     sys.addaudithook(recorder.audit)
-    config.pluginmanager.register(recorder, "panthera-inputs")
+    config.pluginmanager.register(recorder, "diffprowl-inputs")
 
 
 # ------------------------------------------------------------ evidence export
@@ -1214,7 +1214,7 @@ def finish(root, output, engine, pytest_exit, config_path):
 def summary(output, message, report=None):
     path = output / "summary.md"
     path.parent.mkdir(parents=True, exist_ok=True)
-    lines = [f"### Panthera observation\n\nℹ️ {message}. Full pytest result remains authoritative.\n"]
+    lines = [f"### DiffProwl observation\n\nℹ️ {message}. Full pytest result remains authoritative.\n"]
     if report:
         lines.append(f"\n- Baseline: {report['baseline']}")
         inputs = report.get("inputs") or {}

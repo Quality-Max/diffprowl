@@ -189,7 +189,7 @@ class CampaignTests(unittest.TestCase):
         ):
             subprocess.run(["git", *args], cwd=self.repo, check=True, stdout=subprocess.DEVNULL)
         self.config = {"targets": ["service.py"], "suites": ["test_service.py"]}
-        self.engine = Path(__file__).resolve().parents[1] / "target/debug/panthera"
+        self.engine = Path(__file__).resolve().parents[1] / "target/debug/diffprowl"
 
     def test_real_campaign_is_independent_and_preserves_checkout(self):
         output = self.root / "evidence"
@@ -231,7 +231,7 @@ class CampaignTests(unittest.TestCase):
         self.assertEqual(report["trials"][0]["error_type"], "TimeoutExpired")
 
     def test_cli_embeds_adapter_and_runs_outside_source_checkout(self):
-        binary = self.root / "panthera"
+        binary = self.root / "diffprowl"
         shutil.copy2(self.engine, binary)
         (self.root / "scope.json").write_text(json.dumps(self.config))
         (self.root / "campaign.json").write_text(json.dumps({"schema": 1, "trials": [trial()]}))

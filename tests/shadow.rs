@@ -1,4 +1,4 @@
-use panthera::shadow::{Baseline, ExpandReason, Request, TestEvidence, plan};
+use diffprowl::shadow::{Baseline, ExpandReason, Request, TestEvidence, plan};
 use std::collections::{BTreeMap, BTreeSet};
 
 fn request() -> Request {
@@ -294,14 +294,14 @@ fn matching_blank_fingerprints_cannot_authorize_reuse() {
 #[test]
 fn cli_reports_the_build_version() {
     for flag in ["--version", "-V"] {
-        let result = std::process::Command::new(env!("CARGO_BIN_EXE_panthera"))
+        let result = std::process::Command::new(env!("CARGO_BIN_EXE_diffprowl"))
             .arg(flag)
             .output()
             .unwrap();
         assert!(result.status.success());
         assert_eq!(
             String::from_utf8(result.stdout).unwrap().trim(),
-            concat!("panthera ", env!("CARGO_PKG_VERSION"))
+            concat!("diffprowl ", env!("CARGO_PKG_VERSION"))
         );
     }
 }

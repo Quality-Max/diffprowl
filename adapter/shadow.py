@@ -1,4 +1,4 @@
-"""Panthera generic offline pytest shadow adapter; no CI skipping."""
+"""DiffProwl generic offline pytest shadow adapter; no CI skipping."""
 
 from __future__ import annotations
 
@@ -605,7 +605,7 @@ def main():
     configure(json.loads(args.config.read_text()), args.repository.resolve())
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
-    with tempfile.TemporaryDirectory(prefix="panthera-shadow-") as temp:
+    with tempfile.TemporaryDirectory(prefix="diffprowl-shadow-") as temp:
         root = Path(temp)
         mirror(root, args.repository.resolve())
         baseline = json.loads(args.baseline.read_text()) if args.baseline else None

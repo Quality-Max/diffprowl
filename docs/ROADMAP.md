@@ -1,11 +1,11 @@
-# Panthera roadmap
+# DiffProwl roadmap
 
 Status: implementation roadmap, 2026-11-20. Current changes are local and unreleased. Gates describe evidence needed to
 advance; they are not claims that later phases have shipped.
 
 ## Purpose and boundaries
 
-Reduce total test compute and CI cost without hiding regressions. Panthera is an
+Reduce total test compute and CI cost without hiding regressions. DiffProwl is an
 LLM-free selection and evidence engine. It decides which existing checks need
 fresh execution and explains why. Test quality, runners and production behavior
 remain separate responsibilities. Zero selection tokens does not prove lower
@@ -16,7 +16,7 @@ handling. Language adapters own dependency collection and execution contracts.
 A small Rust planner is a valid design; a rewrite or multi-language parser is not
 an acceptance criterion. Parsing alone cannot establish runtime dependencies.
 
-Keep Panthera and 9lives separate: Panthera selects; 9lives executes browser checks
+Keep DiffProwl and 9lives separate: DiffProwl selects; 9lives executes browser checks
 and returns receipts. The simulation is an explicitly labeled experimental model.
 Move it behind an examples/crate boundary when packaging requires that separation;
 do not present its passing invariants as application or production verification.
@@ -130,7 +130,7 @@ release and integration gates unless independently qualified for selection.
 Roll out to one bounded suite first. Cold or invalid evidence runs full tests.
 Audit selection with independent full executions and retain exact failing node IDs
 without captured sensitive output. Rehearse an omitted-failure alert and restore
-full execution automatically. Rollback must not depend on Panthera being healthy.
+full execution automatically. Rollback must not depend on DiffProwl being healthy.
 
 Storage work: byte-bounded request batching, scalable baseline artifacts, retention,
 checksums and provenance. Do not widen baseline trust across forks or applications.

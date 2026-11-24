@@ -66,14 +66,14 @@ jobs:
       - name: Build static x86_64 musl binary
         run: |
           docker run --rm --platform linux/amd64 -v "$PWD:/src" -w /src "$LINUX_BUILDER" \
-            sh -ec 'apk add --no-cache musl-dev >/dev/null && cargo build --release --locked && ./target/release/panthera --version'
+            sh -ec 'apk add --no-cache musl-dev >/dev/null && cargo build --release --locked && ./target/release/diffprowl --version'
           mkdir -p dist
-          cp target/release/panthera dist/panthera-linux-x86_64
-          LC_ALL=C file -b dist/panthera-linux-x86_64 | grep -Eq 'statically linked|static-pie linked'
+          cp target/release/diffprowl dist/diffprowl-linux-x86_64
+          LC_ALL=C file -b dist/diffprowl-linux-x86_64 | grep -Eq 'statically linked|static-pie linked'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: panthera-linux-x86_64
-          path: dist/panthera-linux-x86_64
+          name: diffprowl-linux-x86_64
+          path: dist/diffprowl-linux-x86_64
           if-no-files-found: error
           retention-days: 7
 
@@ -91,13 +91,13 @@ jobs:
           rustup default "$RUST_TOOLCHAIN"
           test "$(uname -m)" = arm64
           cargo build --release --locked
-          ./target/release/panthera --version
+          ./target/release/diffprowl --version
           mkdir -p dist
-          cp target/release/panthera dist/panthera-darwin-arm64
+          cp target/release/diffprowl dist/diffprowl-darwin-arm64
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: panthera-darwin-arm64
-          path: dist/panthera-darwin-arm64
+          name: diffprowl-darwin-arm64
+          path: dist/diffprowl-darwin-arm64
           if-no-files-found: error
           retention-days: 7
 
@@ -122,8 +122,8 @@ jobs:
           WORKFLOW_REF: ${{ github.workflow_ref }}
         run: |
           cd dist
-          chmod 0755 panthera-*
-          sha256sum panthera-darwin-arm64 panthera-linux-x86_64 > SHA256SUMS
+          chmod 0755 diffprowl-*
+          sha256sum diffprowl-darwin-arm64 diffprowl-linux-x86_64 > SHA256SUMS
           python3 - <<'EOF'
           import hashlib, json, os
           def sha(name):
@@ -134,8 +134,8 @@ jobs:
               "tag": os.environ["TAG"],
               "source_commit": os.environ["GITHUB_SHA"],
               "assets": {
-                  "linux-x86_64": {"name": "panthera-linux-x86_64", "sha256": sha("panthera-linux-x86_64")},
-                  "darwin-arm64": {"name": "panthera-darwin-arm64", "sha256": sha("panthera-darwin-arm64")},
+                  "linux-x86_64": {"name": "diffprowl-linux-x86_64", "sha256": sha("diffprowl-linux-x86_64")},
+                  "darwin-arm64": {"name": "diffprowl-darwin-arm64", "sha256": sha("diffprowl-darwin-arm64")},
               },
               "builder": {
                   "workflow_ref": os.environ["WORKFLOW_REF"],
@@ -166,6 +166,6 @@ jobs:
             echo "release $TAG already exists; refusing to overwrite its assets"; exit 1
           fi
           gh release create "$TAG" -R "$GITHUB_REPOSITORY" --verify-tag $flags \
-            --title "Panthera $TAG" \
+            --title "DiffProwl $TAG" \
             --notes "Built by $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. See CHANGELOG.md and build.json." \
-            dist/panthera-linux-x86_64 dist/panthera-darwin-arm64 dist/SHA256SUMS dist/build.json
+            dist/diffprowl-linux-x86_64 dist/diffprowl-darwin-arm64 dist/SHA256SUMS dist/build.json

@@ -50,7 +50,7 @@ class HistoryTests(unittest.TestCase):
                     "worker_timeout_seconds": 10,
                     "periodic_full_every": 3,
                 }
-                result = history.replay(repo, config, manifest, ROOT / "target/debug/panthera", root / "out")
+                result = history.replay(repo, config, manifest, ROOT / "target/debug/diffprowl", root / "out")
                 full = json.loads((root / "out/1/full.json").read_text())
                 self.assertEqual(full["exit_code"], 0)
                 self.assertEqual(result["complete"], not invalid)
@@ -107,7 +107,7 @@ class HistoryTests(unittest.TestCase):
                 "worker_timeout_seconds": 10,
                 "periodic_full_every": 3,
             }
-            result = history.replay(repo, config, manifest, ROOT / "target/debug/panthera", root / "out")
+            result = history.replay(repo, config, manifest, ROOT / "target/debug/diffprowl", root / "out")
             self.assertTrue(result["matches_full"], result)
             first, second, third = result["trials"]
             self.assertEqual(first["selected_cases"], 1)
@@ -122,9 +122,9 @@ class HistoryTests(unittest.TestCase):
                 )
             self.assertEqual(json.loads((root / "out/manifest.json").read_text()), manifest)
             with self.assertRaises(ValueError):
-                history.replay(repo, config, {**manifest, "pilot": []}, ROOT / "target/debug/panthera", root / "empty")
+                history.replay(repo, config, {**manifest, "pilot": []}, ROOT / "target/debug/diffprowl", root / "empty")
             manifest["wall_budget_seconds"] = 0.000000001
-            exhausted = history.replay(repo, config, manifest, ROOT / "target/debug/panthera", root / "exhausted")
+            exhausted = history.replay(repo, config, manifest, ROOT / "target/debug/diffprowl", root / "exhausted")
             self.assertFalse(exhausted["complete"])
             self.assertFalse(exhausted["cost_projection_available"])
             self.assertTrue(all(item["error_type"] == "TimeoutError" for item in exhausted["trials"]))

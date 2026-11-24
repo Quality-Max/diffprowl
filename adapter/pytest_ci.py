@@ -1,4 +1,4 @@
-"""Apply a CI-produced Panthera plan to one explicitly allowed content edit."""
+"""Apply a CI-produced DiffProwl plan to one explicitly allowed content edit."""
 
 import json
 import math
@@ -15,10 +15,16 @@ GIT_TIMEOUT = 10
 
 
 def pytest_addoption(parser):
-    group = parser.getgroup("panthera")
-    group.addoption("--panthera-plan", type=Path, help="Trusted Panthera CI plan JSON")
-    group.addoption("--panthera-select-path", help="Allow selection for a content edit to this Git-root-relative path")
-    group.addoption("--panthera-receipt", type=Path, help="Write a Panthera CI execution receipt")
+    group = parser.getgroup("diffprowl")
+    group.addoption("--diffprowl-plan", "--panthera-plan", type=Path, help="Trusted DiffProwl CI plan JSON")
+    group.addoption(
+        "--diffprowl-select-path",
+        "--panthera-select-path",
+        help="Allow selection for a content edit to this Git-root-relative path",
+    )
+    group.addoption(
+        "--diffprowl-receipt", "--panthera-receipt", type=Path, help="Write a DiffProwl CI execution receipt"
+    )
 
 
 def read_plan(path):
@@ -78,8 +84,8 @@ def checkout_fallback(path, plan, cwd):
 
 
 def validate_plan(config):
-    path = config.getoption("panthera_select_path")
-    plan_path = config.getoption("panthera_plan")
+    path = config.getoption("diffprowl_select_path")
+    plan_path = config.getoption("diffprowl_plan")
     if not path:
         return None, "selection_disabled"
     if config.option.collectonly:
@@ -143,7 +149,7 @@ class ExecutionReceipt:
         inventory = None
         if self.reason is None:
             inventory = {key: self.plan[key] for key in ("baseline_tests", "selected")}
-        node.workerinput["panthera"] = (inventory, self.reason)
+        node.workerinput["diffprowl"] = (inventory, self.reason)
 
     @pytest.hookimpl(optionalhook=True)
     def pytest_xdist_node_collection_finished(self, node, ids):
@@ -154,7 +160,7 @@ class ExecutionReceipt:
 
     @pytest.hookimpl(optionalhook=True)
     def pytest_testnodedown(self, node, error):
-        self.workers.append(getattr(node, "workeroutput", {}).get("panthera_collection"))
+        self.workers.append(getattr(node, "workeroutput", {}).get("diffprowl_collection"))
 
     def pytest_collectreport(self, report):
         self.collection_failed |= report.failed
@@ -197,23 +203,23 @@ class ExecutionReceipt:
         except OSError:
             reporter = session.config.pluginmanager.get_plugin("terminalreporter")
             if reporter is not None:
-                reporter.write_line("Panthera could not write the CI receipt.")
+                reporter.write_line("DiffProwl could not write the CI receipt.")
 
 
 class WorkerSelection(Selection):
     def pytest_sessionfinish(self, session):
-        session.config.workeroutput["panthera_collection"] = self.collection
+        session.config.workeroutput["diffprowl_collection"] = self.collection
 
 
 def pytest_configure(config):
     if hasattr(config, "workerinput"):
-        if "panthera" in config.workerinput:
-            config.pluginmanager.register(WorkerSelection(*config.workerinput["panthera"]))
+        if "diffprowl" in config.workerinput:
+            config.pluginmanager.register(WorkerSelection(*config.workerinput["diffprowl"]))
         return
-    receipt = config.getoption("panthera_receipt")
+    receipt = config.getoption("diffprowl_receipt")
     if receipt is None:
-        if config.getoption("panthera_select_path") or config.getoption("panthera_plan"):
-            raise pytest.UsageError("Panthera selection requires --panthera-receipt")
+        if config.getoption("diffprowl_select_path") or config.getoption("diffprowl_plan"):
+            raise pytest.UsageError("DiffProwl selection requires --diffprowl-receipt")
         return
     start = time.perf_counter()
     plan, reason = validate_plan(config)

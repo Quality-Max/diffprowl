@@ -25,7 +25,7 @@ class InputsTests(unittest.TestCase):
             )
             suite.write_text(source)
             a.configure({"targets": ["service.py"], "suites": [suite.name], "input_tracking": "files"})
-            engine = ROOT / "target/debug/panthera"
+            engine = ROOT / "target/debug/diffprowl"
             before = a.snapshot(root, engine)
             profile = a.run_tests(root, root / "profile.json")
             q.validate_run(profile)
@@ -69,7 +69,7 @@ class InputsTests(unittest.TestCase):
             self.assertEqual(len(resolved["suites"]), 3)
             cases = json.loads((fixture / "campaign.json").read_text())
             cases["trials"] = cases["trials"][:7]
-            report = q.campaign(repo, config, cases, ROOT / "target/debug/panthera", root / "out", 30, 3)
+            report = q.campaign(repo, config, cases, ROOT / "target/debug/diffprowl", root / "out", 30, 3)
             self.assertTrue(report["qualified"], report)
             self.assertEqual(json.loads((root / "out/campaign.json").read_text()), cases)
             self.assertEqual(report["execution_order"], [trial["id"] for trial in report["trials"]])

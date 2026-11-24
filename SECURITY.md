@@ -1,13 +1,13 @@
 # Security
 
-Panthera is a private Quality-Max project. Report suspected vulnerabilities
+DiffProwl is a private Quality-Max project. Report suspected vulnerabilities
 privately to the maintainers, not in issues, pull requests or chat: use a
 private GitHub security advisory on this repository.
 
 ## Scope and trust model
 
-- Panthera executes the test suites it is pointed at. Repository code, scope
-  files and evidence are trusted input; Panthera is not a sandbox.
+- DiffProwl executes the test suites it is pointed at. Repository code, scope
+  files and evidence are trusted input; DiffProwl is not a sandbox.
 - Baselines and receipts are trusted CI evidence, not signed attestations.
   Content hashes detect change; they do not authenticate an author.
 - Release binaries are built and uploaded only by `.github/workflows/release.yml`.

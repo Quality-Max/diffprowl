@@ -12,7 +12,7 @@ from tempfile import TemporaryDirectory
 import pytest_observer as observer
 
 ADAPTER = Path(__file__).resolve().parent
-ENGINE = ADAPTER.parent / "target/debug/panthera"
+ENGINE = ADAPTER.parent / "target/debug/diffprowl"
 REGISTRY = "tests/test_registry.py::test_registry"
 SERVICE = (
     "registry = []\n\ndef register(fn):\n    registry.append(fn.__name__)\n    return fn\n\ndef a():\n    return 1\n"
@@ -58,7 +58,7 @@ class ObserverTests(unittest.TestCase):
             "pytest_observer",
             "-n",
             "2",
-            "--panthera-output",
+            "--diffprowl-output",
             str(self.output),
         ]
         self.run_command("git", "init", "-q")
@@ -90,7 +90,7 @@ class ObserverTests(unittest.TestCase):
         self.run_command(
             "git",
             "-c",
-            "user.name=Panthera",
+            "user.name=DiffProwl",
             "-c",
             "user.email=test@example.test",
             "-c",

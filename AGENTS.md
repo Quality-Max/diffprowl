@@ -1,4 +1,4 @@
-# Panthera
+# DiffProwl
 
 LLM-free Rust engine with an optional Python shadow adapter. Keep application-specific
 scopes in their application repository. 9lives integration is planned, not implemented.
