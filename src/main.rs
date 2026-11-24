@@ -1,4 +1,4 @@
-use panthera::{
+use diffprowl::{
     Result,
     evidence::{Evidence, Replay, read_json, write_json},
     experiment,
@@ -10,7 +10,7 @@ fn main() {
     match cli() {
         Ok(code) => std::process::exit(code),
         Err(error) => {
-            eprintln!("panthera: {error}");
+            eprintln!("diffprowl: {error}");
             std::process::exit(2);
         }
     }
@@ -39,7 +39,7 @@ fn qualify(args: &[String]) -> Result<i32> {
     });
     let bootstrap = r#"import json, pathlib, runpy, sys, tempfile
 sources = json.loads(sys.argv.pop(1))
-with tempfile.TemporaryDirectory(prefix="panthera-adapter-") as directory:
+with tempfile.TemporaryDirectory(prefix="diffprowl-adapter-") as directory:
     root = pathlib.Path(directory)
     for name, source in sources.items():
         (root / name).write_text(source)
@@ -62,7 +62,7 @@ fn cli() -> Result<i32> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
         Some("--version" | "-V") if args.len() == 1 => {
-            println!("panthera {}", env!("CARGO_PKG_VERSION"));
+            println!("diffprowl {}", env!("CARGO_PKG_VERSION"));
             Ok(0)
         }
         Some("qualify") => qualify(&args[1..]),
@@ -70,7 +70,7 @@ fn cli() -> Result<i32> {
             let request = read_json(Path::new(&args[1]))?;
             println!(
                 "{}",
-                serde_json::to_string_pretty(&panthera::shadow::plan(request)?)?
+                serde_json::to_string_pretty(&diffprowl::shadow::plan(request)?)?
             );
             Ok(0)
         }
@@ -115,7 +115,7 @@ fn cli() -> Result<i32> {
         }
         Some("help" | "--help" | "-h") | None => {
             println!(
-                "panthera demo OUTPUT_DIR [SEEDS=32] [REPETITIONS=25]\npanthera run OUTPUT_DIR DEFECT [SEEDS=32] [BASELINE_EVIDENCE.json]\npanthera replay REPLAY.json\npanthera shadow-plan REQUEST.json\npanthera qualify REPOSITORY SCOPE.json CAMPAIGN.json OUTPUT_DIR [--python PYTHON] [--timeout SECONDS] [--full-every N]\n\nDefects: none, double_release, missing_authorization, lost_cancellation, double_settlement, duplicate_submission\nExit codes: 0 success/matching replay, 1 detected regression or failed experiment, 2 invalid input/I/O.\nLocal fixture only. Evidence is trusted local input, not a signed CI attestation."
+                "diffprowl demo OUTPUT_DIR [SEEDS=32] [REPETITIONS=25]\ndiffprowl run OUTPUT_DIR DEFECT [SEEDS=32] [BASELINE_EVIDENCE.json]\ndiffprowl replay REPLAY.json\ndiffprowl shadow-plan REQUEST.json\ndiffprowl qualify REPOSITORY SCOPE.json CAMPAIGN.json OUTPUT_DIR [--python PYTHON] [--timeout SECONDS] [--full-every N]\n\nDefects: none, double_release, missing_authorization, lost_cancellation, double_settlement, duplicate_submission\nExit codes: 0 success/matching replay, 1 detected regression or failed experiment, 2 invalid input/I/O.\nLocal fixture only. Evidence is trusted local input, not a signed CI attestation."
             );
             Ok(0)
         }

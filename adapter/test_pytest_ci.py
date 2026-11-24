@@ -15,7 +15,7 @@ import qualify
 import shadow
 
 ROOT = Path(__file__).resolve().parents[1]
-ENGINE = ROOT / "target/debug/panthera"
+ENGINE = ROOT / "target/debug/diffprowl"
 EXAMPLE = ROOT / "examples/ci_demo"
 
 
@@ -42,7 +42,7 @@ class PytestCITests(unittest.TestCase):
             [
                 "git",
                 "-c",
-                "user.name=Panthera",
+                "user.name=DiffProwl",
                 "-c",
                 "user.email=test@example.test",
                 "-c",
@@ -86,7 +86,7 @@ class PytestCITests(unittest.TestCase):
     def pytest(self, name, *args, enable=True):
         receipt = self.temp / f"{name}.json"
         results = self.temp / f"{name}.xml"
-        policy = [f"--panthera-plan={self.plan_path}", "--panthera-select-path=landing.html"] if enable else []
+        policy = [f"--diffprowl-plan={self.plan_path}", "--diffprowl-select-path=landing.html"] if enable else []
         command = [
             sys.executable,
             "-m",
@@ -95,7 +95,7 @@ class PytestCITests(unittest.TestCase):
             "no:cacheprovider",
             "-p",
             "pytest_ci",
-            f"--panthera-receipt={receipt}",
+            f"--diffprowl-receipt={receipt}",
             f"--junitxml={results}",
             "-q",
             "--tb=no",

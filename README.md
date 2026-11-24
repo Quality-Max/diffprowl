@@ -1,4 +1,4 @@
-# Panthera
+# DiffProwl
 
 ![A black panther following a selected path through a dependency graph](assets/panthera-hero.png)
 
@@ -20,7 +20,7 @@ From the repository root (tested with Rust/Cargo 1.94.1):
 cargo test --locked
 cargo clippy --locked --all-targets -- -D warnings
 cargo build --release --locked
-target/release/panthera demo artifacts/demo 32 25
+target/release/diffprowl demo artifacts/demo 32 25
 ```
 
 The demo executes six contracts across 32 seeds: 192 scenarios per full suite.
@@ -30,8 +30,8 @@ All generated JSON artifacts are named by SHA-256 of their serialized contents.
 Use the printed report path or redirect stdout to keep a convenient index.
 
 ```sh
-target/release/panthera run artifacts/demo none 32
-target/release/panthera run artifacts/demo double_release 32
+target/release/diffprowl run artifacts/demo none 32
+target/release/diffprowl run artifacts/demo double_release 32
 ```
 
 To reuse evidence, append the **evidence artifact** path from the first run's
@@ -39,8 +39,8 @@ To reuse evidence, append the **evidence artifact** path from the first run's
 failure, pass an artifact listed in a report's `replays` field:
 
 ```text
-panthera run OUTPUT_DIR DEFECT [SEEDS=32] [BASELINE_EVIDENCE.json]
-panthera replay REPLAY.json
+diffprowl run OUTPUT_DIR DEFECT [SEEDS=32] [BASELINE_EVIDENCE.json]
+diffprowl replay REPLAY.json
 ```
 
 Exit codes: `0` successful run, successful experiment, or exact replay match;
@@ -174,9 +174,9 @@ python3 -m venv .venv
 .venv/bin/python -m pip install -r adapter/requirements-dev.txt
 cargo build --release --locked
 .venv/bin/python adapter/shadow.py . examples/pytest_demo/scope.json \
-  target/release/panthera artifacts/before
+  target/release/diffprowl artifacts/before
 .venv/bin/python adapter/shadow.py . examples/pytest_demo/scope.json \
-  target/release/panthera artifacts/unchanged --baseline artifacts/before/baseline.json
+  target/release/diffprowl artifacts/unchanged --baseline artifacts/before/baseline.json
 ```
 
 Use a new output directory each time. The second comparison should execute no
@@ -221,7 +221,7 @@ runs both selections. Peak memory, provider cost and CI billing are not measured
 
 ## Opt-in pytest CI selection
 
-`adapter/pytest_ci.py` applies a trusted Panthera plan in ordinary pytest and
+`adapter/pytest_ci.py` applies a trusted DiffProwl plan in ordinary pytest and
 pytest-xdist jobs. Enable it for a reviewed content file whose tests have been
 qualified in the application repository. The application CI owns the baseline,
 plan generation, path allowlist, and schedule for full comparisons.
@@ -232,11 +232,11 @@ external artifact directory and the `--option=value` form to keep artifact paths
 out of pytest's root directory inference:
 
 ```sh
-PYTHONPATH="/path/to/panthera/adapter${PYTHONPATH:+:$PYTHONPATH}" \
+PYTHONPATH="/path/to/diffprowl/adapter${PYTHONPATH:+:$PYTHONPATH}" \
   python -m pytest -p pytest_ci \
-  --panthera-plan=/ci-artifacts/panthera-plan.json \
-  --panthera-select-path=static/landing.html \
-  --panthera-receipt=/ci-artifacts/panthera-execution.json
+  --diffprowl-plan=/ci-artifacts/diffprowl-plan.json \
+  --diffprowl-select-path=static/landing.html \
+  --diffprowl-receipt=/ci-artifacts/diffprowl-execution.json
 ```
 
 CI wraps the engine's `selected` and `expand` fields in a JSON object with
@@ -256,7 +256,7 @@ The execution receipt reports selected or full mode, the fallback reason,
 counts of collected, scheduled, attempted, and failed tests,
 pytest's exit code, validation time, pytest wall time, and supplied planning
 time. Collection failures can produce an incomplete receipt. A job supplying
-only `--panthera-receipt` records an ordinary full comparison. Use fresh jobs
+only `--diffprowl-receipt` records an ordinary full comparison. Use fresh jobs
 with the same inputs and account for planning and baseline maintenance when
 measuring CI savings.
 
@@ -266,7 +266,7 @@ Its campaign also seeds two faults that would allow an earlier transient error
 to mask a later permanent error, one in the worker and one in its dependency:
 
 ```sh
-target/release/panthera qualify . examples/ci_demo/scope.json \
+target/release/diffprowl qualify . examples/ci_demo/scope.json \
   examples/ci_demo/campaign.json artifacts/ci-demo --python .venv/bin/python
 ```
 
@@ -279,7 +279,7 @@ The release binary embeds the adapter; Python 3.11+, pytest, pytest-asyncio and 
 application's test dependencies must still be installed in the chosen interpreter.
 
 ```sh
-target/release/panthera qualify . examples/pytest_demo/scope.json \
+target/release/diffprowl qualify . examples/pytest_demo/scope.json \
   examples/pytest_demo/campaign.json artifacts/qualification \
   --python .venv/bin/python --timeout 180
 ```
@@ -342,7 +342,7 @@ five example trials and three QualityMax faults against a 449-test scope.
 
 ## Relationship to 9lives
 
-Panthera owns selection and evidence-reuse decisions. 9lives owns browser execution
+DiffProwl owns selection and evidence-reuse decisions. 9lives owns browser execution
 and execution receipts. They remain separate repositories, with a planned adapter
 exchanging versioned plans and receipts. The current `shadow-plan` schema is an
 experimental local pytest contract; **no 9lives integration is implemented yet**.
@@ -361,7 +361,7 @@ and filesystem inputs. The elapsed planning and export times are distinct from
 the cost of running or profiling pytest. The full pytest command retains its
 original exit status and runs without applying the plan.
 
-Use a checked-out, pinned Panthera source revision with its `adapter/` directory
+Use a checked-out, pinned DiffProwl source revision with its `adapter/` directory
 and a matching schema 2 binary. Install pytest-cov in the job's Python environment.
 In the application, commit an observer JSON such as `{"discover_roots":["src"]}`
 or `{"targets":["app.py"]}`. Run from the Git root with pytest's rootdir set to
@@ -370,13 +370,13 @@ observer and coverage options to both invocations:
 
 ```sh
 # Bash, run from the application Git root.
-export PYTHONPATH="$PANTHERA_SRC/adapter${PYTHONPATH:+:$PYTHONPATH}"
-output=.context/panthera-unit
+export PYTHONPATH="$DIFFPROWL_SRC/adapter${PYTHONPATH:+:$PYTHONPATH}"
+output=.context/diffprowl-unit
 mkdir -p "$output"
-options=(--config ci/panthera-unit.json --output "$output"
-         --engine "$PANTHERA_BIN" --engine-sha256 "$PANTHERA_SHA256")
+options=(--config ci/diffprowl-unit.json --output "$output"
+         --engine "$DIFFPROWL_BIN" --engine-sha256 "$DIFFPROWL_SHA256")
 suite=(tests/unit/ --rootdir="$PWD" --cov=src)
-observed=("${suite[@]}" --cov-context=test -p pytest_observer --panthera-output "$output")
+observed=("${suite[@]}" --cov-context=test -p pytest_observer --diffprowl-output "$output")
 if python -m pytest_observer "${options[@]}" prepare -- "${observed[@]}"; then
     if COVERAGE_FILE="$PWD/$output/.coverage" python -m pytest "${observed[@]}"; then
         status=0
@@ -456,6 +456,8 @@ both selected and full suites.
 See the [security-inclusive shadow validation](docs/security-shadow-2026-11-20.md)
 for a bounded whole-suite experiment and its execution limits.
 
+The pytest plugins also accept the original `--panthera-*` spellings.
+
 ## Development
 
 ```sh
@@ -479,7 +481,7 @@ section. It runs the CI checks, builds a static x86-64 musl binary in
 `rust:1.94.1-alpine3.22` (pinned by digest, `--platform linux/amd64`) and a
 macOS arm64 binary on `macos-15`, then uploads them with `SHA256SUMS` and a
 schema 2 `build.json` naming the workflow run, toolchain and builder. Existing
-releases are never overwritten. `panthera --version` identifies the build.
+releases are never overwritten. `diffprowl --version` identifies the build.
 
 Consumers must pin both the release and the SHA-256 of their platform asset,
 and should check that the asset uploader is `github-actions[bot]` and that
@@ -530,7 +532,7 @@ Its campaign seed deterministically orders the declared cases; this is a curated
 campaign, not random repository-wide fault coverage. Run:
 
 ```sh
-target/debug/panthera qualify . examples/input_demo/scope.json \
+target/debug/diffprowl qualify . examples/input_demo/scope.json \
   examples/input_demo/campaign.json artifacts/input-campaign \
   --python .venv/bin/python --full-every 5
 ```
@@ -602,3 +604,7 @@ by the user named in the `QMAX_DOCS_APPROVER` repository variable, for one exact
 reviewed commit. Enable Pages with **Source: GitHub Actions** and set that
 variable before the first run. Do not place evidence, scopes, receipts or
 application details under `site/`.
+
+## License
+
+Copyright (c) 2026 Quality-Max. The project source code is licensed under the [Apache License, Version 2.0](LICENSE).

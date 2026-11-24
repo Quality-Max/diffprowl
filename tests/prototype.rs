@@ -1,4 +1,4 @@
-use panthera::{
+use diffprowl::{
     engine::*,
     evidence::*,
     experiment,
@@ -15,7 +15,7 @@ impl TempDirectory {
     fn new() -> Self {
         static COUNTER: AtomicU64 = AtomicU64::new(0);
         let directory = std::env::temp_dir().join(format!(
-            "panthera-{}-{}",
+            "diffprowl-{}-{}",
             std::process::id(),
             COUNTER.fetch_add(1, Ordering::Relaxed)
         ));
@@ -414,7 +414,7 @@ fn full_demo_records_selection_evidence_and_replays() {
 #[test]
 fn cli_reports_regression_and_replays_across_processes() {
     let directory = TempDirectory::new();
-    let binary = env!("CARGO_BIN_EXE_panthera");
+    let binary = env!("CARGO_BIN_EXE_diffprowl");
     let output = std::process::Command::new(binary)
         .args(["run", directory.0.to_str().unwrap(), "double_release", "2"])
         .output()

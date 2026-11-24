@@ -180,7 +180,7 @@ class AdapterTests(unittest.TestCase):
             shadow.resource_file(self.root, "linked/versions.json")
 
     def test_batched_plans_match_real_engine_for_changes_and_fallbacks(self):
-        engine = Path(__file__).resolve().parents[1] / "target/debug/panthera"
+        engine = Path(__file__).resolve().parents[1] / "target/debug/diffprowl"
         original = {"shared": "same", "symbols": {"f": "v1", "g": "v1"}}
         tests = {
             f"test_service.py::test_{index}_é": {
@@ -277,7 +277,7 @@ class AdapterTests(unittest.TestCase):
                     shadow.plan_shadow(current, baseline, self.root, Path("engine"))
 
     def test_cold_and_empty_baselines_expand_in_real_engine(self):
-        engine = Path(__file__).resolve().parents[1] / "target/debug/panthera"
+        engine = Path(__file__).resolve().parents[1] / "target/debug/diffprowl"
         current = {"shared": "same", "symbols": {"f": "v1"}}
         for baseline in (None, {**current, "tests": {}}):
             self.assertTrue(shadow.plan_shadow(current, baseline, self.root, engine)["expand"])
@@ -286,7 +286,7 @@ class AdapterTests(unittest.TestCase):
             call.assert_not_called()
 
     def test_real_worker_and_rust_planner_select_a_regression(self):
-        engine = Path(__file__).resolve().parents[1] / "target/debug/panthera"
+        engine = Path(__file__).resolve().parents[1] / "target/debug/diffprowl"
         self.assertTrue(engine.is_file(), "run cargo test before adapter tests")
         shadow.configure({"targets": ["app/service.py"], "suites": ["test_service.py"], "resources": ["versions.json"]})
         (self.root / "versions.json").write_text('{"version": 1}')

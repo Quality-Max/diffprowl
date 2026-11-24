@@ -28,7 +28,7 @@ class FixtureConsumersTests(unittest.TestCase):
                 "def test_reuse(wrapped): assert wrapped == 1\n"
             )
             a.configure({"targets": [service.name], "suites": ["test_value.py"], "fixture_tracking": "consumers"})
-            engine = ROOT / "target/debug/panthera"
+            engine = ROOT / "target/debug/diffprowl"
             before = a.snapshot(root, engine)
             profile = a.run_tests(root, root / "profile.json")
             q.validate_run(profile)
@@ -124,7 +124,7 @@ class FixtureConsumersTests(unittest.TestCase):
                     self.assertEqual(profile["exit_code"], 0)
                     unrelated = profile["tests"]["test_value.py::test_unrelated"]["dependencies"]
                     self.assertNotIn("service.py::value", unrelated)
-                    before = a.snapshot(root, ROOT / "target/debug/panthera")
+                    before = a.snapshot(root, ROOT / "target/debug/diffprowl")
                     baseline = {
                         **before,
                         "tests": {
@@ -134,7 +134,10 @@ class FixtureConsumersTests(unittest.TestCase):
                     }
                     service.write_text("def value(): return 0\ndef other(): return 2\n")
                     plan = a.plan_shadow(
-                        a.snapshot(root, ROOT / "target/debug/panthera"), baseline, root, ROOT / "target/debug/panthera"
+                        a.snapshot(root, ROOT / "target/debug/diffprowl"),
+                        baseline,
+                        root,
+                        ROOT / "target/debug/diffprowl",
                     )
                     self.assertEqual(len(plan["selected"]), 4)
                     selected = a.run_tests(root, root / "selected.json", plan["selected"], False)

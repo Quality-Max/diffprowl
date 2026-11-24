@@ -235,7 +235,7 @@ def campaign(repository, config, mutations, engine, output, timeout, full_every=
     report["execution_order"] = [trial["id"] for trial in mutations["trials"]]
     write(output / "report.json", report)
     try:
-        with tempfile.TemporaryDirectory(prefix="panthera-qualify-") as temp:
+        with tempfile.TemporaryDirectory(prefix="diffprowl-qualify-") as temp:
             pristine, root = Path(temp) / "pristine", Path(temp) / "work"
             pristine.mkdir()
             a.mirror(pristine, repository)

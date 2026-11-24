@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>How Panthera decides which tests to run</title>
-<meta name="description" content="Panthera fingerprints the code, plans each test against the last full run, then checks its own answer against a full run.">
+<title>How DiffProwl decides which tests to run</title>
+<meta name="description" content="DiffProwl fingerprints the code, plans each test against the last full run, then checks its own answer against a full run.">
 <style>
 *{box-sizing:border-box}
 :root{color-scheme:light;--page:#f9f9f7;--surface:#fcfcfb;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--grid:#e1e0d9;--axis:#c3c2b7;--wash:#f4f3ef;--border:rgba(11,11,11,.12);--run:#2a78d6;--tile:#cde2fb;--expand:#eb6834;--reuse:#c3c2b7;--crit:#d03b3b}
@@ -68,8 +68,8 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.95em}
 </head>
 <body>
 <main>
-<p class="kicker">Panthera</p>
-<h1>How Panthera decides which tests to run</h1>
+<p class="kicker">DiffProwl</p>
+<h1>How DiffProwl decides which tests to run</h1>
 <p class="sub">It fingerprints the code, asks three questions about each test, then checks its own answer against a full run. Nothing is skipped on its say-so, and no LLM is involved.</p>
 
 <div class="row">
@@ -85,7 +85,7 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.95em}
  <div class="arrow" aria-hidden="true"><svg width="34" height="24"><path d="M3 12 H27 M20 5 L28 12 L20 19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
  <section class="panel" aria-labelledby="s2">
   <div class="step"><span class="num">2</span><h2 id="s2">Plan each test</h2></div>
-  <p class="where">Rust planner, <code>panthera shadow-plan</code></p>
+  <p class="where">Rust planner, <code>diffprowl shadow-plan</code></p>
   <div class="base"><b>Baseline from the last full run:</b> the hashes from step 1, and for each test whether it passed and which target functions it called.</div>
   <div class="q first"><div class="t">Is there no baseline, or did the shared hash or the list of functions change?<small>asked once for the whole run</small></div><div class="yes">yes</div><div class="pill"><i style="background:var(--expand)"></i><span>EXPAND<small>run every test</small></span></div></div>
   <div class="q"><div class="t">Did this test not pass last time, or does it have no recorded calls?</div><div class="yes">yes</div><div class="pill"><i style="background:var(--run)"></i><span>RUN<small>evidence unusable</small></span></div></div>
@@ -111,7 +111,7 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.95em}
 <svg class="loop" viewBox="0 0 1320 58" aria-hidden="true"><path d="M1115 4 V30 Q1115 42 1103 42 H631 Q619 42 619 30 V12" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="5 4"/><path d="M612 20 L619 10 L626 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><text x="867" y="34" text-anchor="middle" font-size="12.5" style="paint-order:stroke;stroke-width:8px">a complete full run becomes the next baseline</text></svg>
 <p class="looptext">A complete full run becomes the next baseline for step 2.</p>
 
-<p class="foot">Describes the pytest selection path of Panthera v0.2.0-rc.1. There is no test-skipping switch: shadow and qualify modes always execute the full scoped suite as the comparison. Panthera's bounded simulation of a job-cancellation world is a separate part of the project and is not shown here.</p>
+<p class="foot">Describes the pytest selection path of DiffProwl v0.2.0-rc.1. There is no test-skipping switch: shadow and qualify modes always execute the full scoped suite as the comparison. DiffProwl's bounded simulation of a job-cancellation world is a separate part of the project and is not shown here.</p>
 </main>
 </body>
 </html>

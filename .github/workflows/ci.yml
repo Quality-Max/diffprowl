@@ -45,7 +45,7 @@ jobs:
       - name: cargo clippy
         run: cargo clippy --locked --all-targets -- -D warnings
       - name: cargo test
-        # Also builds target/debug/panthera, which the adapter end-to-end tests run.
+        # Also builds target/debug/diffprowl, which the adapter end-to-end tests run.
         run: cargo test --locked
       - name: ruff
         run: |

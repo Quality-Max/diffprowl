@@ -1,9 +1,13 @@
 # Changelog
 
-All notable changes to Panthera. Versions follow the tags whose binaries
+All notable changes to DiffProwl. Versions follow the tags whose binaries
 consumers pin; see `build.json` in each release for the producing workflow run.
 
 ## [Unreleased]
+
+- Renamed Panthera to DiffProwl. New builds use the `diffprowl` binary and asset names.
+  The pytest plugins accept both `--diffprowl-*` and legacy `--panthera-*` options.
+- Licensed the project source code under Apache-2.0.
 
 ## [0.2.0-rc.2]
 

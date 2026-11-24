@@ -124,7 +124,7 @@ def replay(repository, config, manifest, engine, output):
             if "discover" in scoped:
                 scoped["discover"] = {**scoped["discover"], "suites": scoped["suites"]}
             item["requested_suites"] = scoped["suites"]
-            with tempfile.TemporaryDirectory(prefix="panthera-history-") as temp:
+            with tempfile.TemporaryDirectory(prefix="diffprowl-history-") as temp:
                 root = Path(temp)
                 base, head, work = root / "base", root / "head", root / "work"
                 prep = q.clock()

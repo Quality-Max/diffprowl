@@ -1,4 +1,4 @@
-# Panthera artwork
+# DiffProwl artwork
 
 Generated with the built-in image generation tool. These are raster PNG assets; the logo has a transparent background.
 
