@@ -12,6 +12,33 @@ the resulting executable runs offline.
 This is a **bounded in-process fixture**, not a QualityMax production integration or
 a safe-to-skip recommendation for the repository's existing CI gates.
 
+## Codex prompts for pytest
+
+Open this checkout in Codex to use the [DiffProwl skill](.agents/skills/diffprowl/SKILL.md). When working in another repository, install the skill there or in your personal skills directory. Paste a prompt and replace the placeholders with a PR, test ID, or CI run.
+
+**Explain a full-suite run**
+
+```text
+Use $diffprowl to explain why the pytest observer selected the full suite for <PR>.
+Which baseline did CI load? Show the reported reason and the evidence for it.
+```
+
+**Check whether a plan catches a known failure**
+
+```text
+Use $diffprowl to replay <PR> against its own base commit. The known failure is
+<pytest node ID>. Run the full scoped suite as a control and tell me whether
+the plan caught the same failing case and phase, and how many tests it selected.
+```
+
+**Measure CI time**
+
+```text
+Use $diffprowl to compare <CI run> with ordinary full pytest on the same revision
+and scope. Report elapsed time for each, including profiling and planning costs.
+If timings are missing, tell me which measurement would settle the comparison.
+```
+
 ## Run
 
 From the repository root (tested with Rust/Cargo 1.94.1):

@@ -1,0 +1,4 @@
+interface:
+  display_name: "DiffProwl"
+  short_description: "Observe pytest plans and diagnose full-suite fallbacks"
+  default_prompt: "Use $diffprowl to explain why the pytest observer selected the full suite for this change."
