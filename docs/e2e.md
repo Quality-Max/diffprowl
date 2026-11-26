@@ -54,6 +54,12 @@ a dedicated booted test simulator/emulator in `DIFFPROWL_SIMULATOR`, and set
 `DIFFPROWL_PLATFORM` to `ios` or `android`. Install the corresponding XCUITest or
 UiAutomator2 driver. Use your own endpoint and normal test command for other suites.
 
+Install `pytest` and `Appium-Python-Client` in the Python environment used below.
+For iOS, XCUITest needs a working WebDriverAgent. If you already built its runner
+for the simulator, the Appium server can use it with the default capabilities
+`appium:usePreinstalledWDA=true` and `appium:prebuiltWDAPath` pointing to the
+runner's `.app` directory.
+
 ```sh
 "$ENGINE" observe appium --scope appium.json --runtime-id "$DEVICE_IMAGE_AND_APP_DIGEST" \
   --output ../mobile-base -- sh -c \
