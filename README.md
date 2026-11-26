@@ -12,6 +12,18 @@ the resulting executable runs offline.
 This is a **bounded in-process fixture**, not a QualityMax production integration or
 a safe-to-skip recommendation for the repository's existing CI gates.
 
+## Observe Playwright and Appium in CI
+
+Run the existing full test command through `diffprowl observe playwright` or
+`diffprowl observe appium`. The command plans from a previous full run, executes
+the project's normal runner once, and compares its results with the advisory plan.
+The runner controls browsers, devices, workers, retries, and exit status. The
+observer and Playwright reporter ship inside the binary built from this revision.
+Use Python 3.11+ and Git on the runner.
+
+See the [setup and scope examples](docs/e2e.md) for Playwright Test (JS/TS)
+and Appium runners that produce JUnit XML, including pytest and WebdriverIO.
+
 ## Codex prompts for pytest
 
 Open this checkout in Codex to use the [DiffProwl skill](.agents/skills/diffprowl/SKILL.md). When working in another repository, install the skill there or in your personal skills directory. Paste a prompt and replace the placeholders with a PR, test ID, or CI run.

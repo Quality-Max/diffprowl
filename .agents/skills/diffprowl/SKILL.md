@@ -1,6 +1,6 @@
 ---
 name: diffprowl
-description: Observe and qualify DiffProwl test selection for pytest, diagnose full-suite fallbacks, and replay historical failures using a pinned engine and a full control run.
+description: Observe DiffProwl test selection for pytest, Playwright Test and Appium JUnit jobs, diagnose full-suite fallbacks, and qualify or replay pytest changes using a pinned engine and a full control run.
 ---
 
 # DiffProwl
@@ -12,6 +12,13 @@ Start from the application's Git root and the DiffProwl revision used by that ap
 Follow “Observe an existing pytest CI job” in the engine README for the exact invocation of `adapter/pytest_observer.py`. Keep the job's pytest arguments, coverage file, parallel workers, and exit status. Run all scoped tests. Keep application baselines, inventories, node IDs, and dependency maps in private application-controlled storage. Keep release credentials outside the pytest process.
 
 Match the run and report to the same head SHA. Check which ancestor baseline the observer actually loaded, its engine digest and scope, the collection on each worker, and the reported expansion reason. A published profile can exist even when CI could not load it. When diagnostics are incomplete, record the last confirmed step. A null omitted-failure count means the comparison was unavailable.
+
+For a Playwright Test or Appium job, read `docs/e2e.md` and use the pinned
+binary's `observe` command. Identify the actual runner, browser/device lane, app
+build, scoped inputs and prior commit before interpreting selection. Use the
+native runner's full command. Inspect receipt completeness, expansion reason,
+selected groups and omitted failures. Treat a missing JUnit shard, setup error
+or incomplete browser run as inconclusive.
 
 ## Check a change against a failure
 
