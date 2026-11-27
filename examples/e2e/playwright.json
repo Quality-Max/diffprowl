@@ -1,0 +1,7 @@
+{
+  "schema": 1,
+  "inputs": {
+    "landing.html": ["landing.spec.cjs"],
+    "status.spec.cjs": ["status.spec.cjs"]
+  }
+}

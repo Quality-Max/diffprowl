@@ -53,3 +53,10 @@ jobs:
           python -m ruff format --check adapter examples
       - name: adapter tests
         run: python -m unittest discover -s adapter -p 'test_*.py' -v
+      - name: Verify Playwright observation with Chromium
+        env:
+          DIFFPROWL_PLAYWRIGHT_MODULES: ${{ runner.temp }}/diffprowl-playwright/node_modules
+        run: |
+          npm install --prefix "$RUNNER_TEMP/diffprowl-playwright" --no-audit --no-fund @playwright/test@1.65.1
+          "$DIFFPROWL_PLAYWRIGHT_MODULES/.bin/playwright" install --with-deps chromium
+          python -m unittest discover -s adapter -p 'test_playwright_live.py' -v

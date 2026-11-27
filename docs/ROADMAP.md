@@ -138,8 +138,8 @@ Concurrent writers need atomic publication and compatible source revisions.
 
 ### 5. Additional languages and 9lives
 
-Choose the next adapter from measured CI spend. Potential candidates are
-TypeScript/JavaScript plus Playwright, Go and Rust. Define a common receipt with
+Playwright Test and Appium JUnit jobs have a [full-run observer](e2e.md).
+Choose additional adapters such as Go or Rust from measured CI spend. Define a common receipt with
 runner/version, source/input identity, environment compatibility, phase results,
 dependencies, uncertainty/fallback reason and timing.
 

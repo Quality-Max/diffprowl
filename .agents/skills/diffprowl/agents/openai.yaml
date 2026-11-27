@@ -1,4 +1,4 @@
 interface:
   display_name: "DiffProwl"
-  short_description: "Observe pytest plans and diagnose full-suite fallbacks"
+  short_description: "Observe pytest, Playwright and Appium test plans"
   default_prompt: "Use $diffprowl to explain why the pytest observer selected the full suite for this change."

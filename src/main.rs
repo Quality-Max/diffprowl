@@ -31,12 +31,43 @@ fn qualify(args: &[String]) -> Result<i32> {
     if args.len() < 4 {
         return Err("qualify requires REPOSITORY SCOPE.json CAMPAIGN.json OUTPUT_DIR [--python PYTHON] [--timeout SECONDS] [--full-every N]".into());
     }
+    let mut adapter_args = args[..4].to_vec();
+    adapter_args.push(std::env::current_exe()?.to_string_lossy().into_owned());
+    adapter_args.extend_from_slice(&args[4..]);
+    run_adapter(
+        &python,
+        "qualify.py",
+        serde_json::json!({
+            "shadow.py": include_str!("../adapter/shadow.py"),
+            "qualify.py": include_str!("../adapter/qualify.py"),
+        }),
+        &adapter_args,
+    )
+}
+
+fn observe(args: &[String]) -> Result<i32> {
+    let mut adapter_args = vec![std::env::current_exe()?.to_string_lossy().into_owned()];
+    adapter_args.extend_from_slice(args);
+    run_adapter(
+        "python3",
+        "e2e.py",
+        serde_json::json!({
+            "shadow.py": include_str!("../adapter/shadow.py"),
+            "e2e.py": include_str!("../adapter/e2e.py"),
+            "playwright_reporter.cjs": include_str!("../adapter/playwright_reporter.cjs"),
+        }),
+        &adapter_args,
+    )
+}
+
+fn run_adapter(
+    python: &str,
+    entry: &str,
+    sources: serde_json::Value,
+    args: &[String],
+) -> Result<i32> {
     // Embed the adapter so a copied release binary does not need a source checkout.
     // Materialize it temporarily because pytest workers launch shadow.py by path.
-    let sources = serde_json::json!({
-        "shadow.py": include_str!("../adapter/shadow.py"),
-        "qualify.py": include_str!("../adapter/qualify.py"),
-    });
     let bootstrap = r#"import json, pathlib, runpy, sys, tempfile
 sources = json.loads(sys.argv.pop(1))
 with tempfile.TemporaryDirectory(prefix="diffprowl-adapter-") as directory:
@@ -44,16 +75,15 @@ with tempfile.TemporaryDirectory(prefix="diffprowl-adapter-") as directory:
     for name, source in sources.items():
         (root / name).write_text(source)
     sys.path.insert(0, directory)
-    sys.argv[0] = str(root / "qualify.py")
+    sys.argv[0] = str(root / sys.argv.pop(1))
     runpy.run_path(sys.argv[0], run_name="__main__")
 "#;
     let status = std::process::Command::new(python)
         .arg("-c")
         .arg(bootstrap)
         .arg(serde_json::to_string(&sources)?)
-        .args(&args[..4])
-        .arg(std::env::current_exe()?)
-        .args(&args[4..])
+        .arg(entry)
+        .args(args)
         .status()?;
     Ok(status.code().unwrap_or(2))
 }
@@ -65,6 +95,7 @@ fn cli() -> Result<i32> {
             println!("diffprowl {}", env!("CARGO_PKG_VERSION"));
             Ok(0)
         }
+        Some("observe") => observe(&args[1..]),
         Some("qualify") => qualify(&args[1..]),
         Some("shadow-plan") if args.len() == 2 => {
             let request = read_json(Path::new(&args[1]))?;
@@ -115,7 +146,7 @@ fn cli() -> Result<i32> {
         }
         Some("help" | "--help" | "-h") | None => {
             println!(
-                "diffprowl demo OUTPUT_DIR [SEEDS=32] [REPETITIONS=25]\ndiffprowl run OUTPUT_DIR DEFECT [SEEDS=32] [BASELINE_EVIDENCE.json]\ndiffprowl replay REPLAY.json\ndiffprowl shadow-plan REQUEST.json\ndiffprowl qualify REPOSITORY SCOPE.json CAMPAIGN.json OUTPUT_DIR [--python PYTHON] [--timeout SECONDS] [--full-every N]\n\nDefects: none, double_release, missing_authorization, lost_cancellation, double_settlement, duplicate_submission\nExit codes: 0 success/matching replay, 1 detected regression or failed experiment, 2 invalid input/I/O.\nLocal fixture only. Evidence is trusted local input, not a signed CI attestation."
+                "diffprowl demo OUTPUT_DIR [SEEDS=32] [REPETITIONS=25]\ndiffprowl run OUTPUT_DIR DEFECT [SEEDS=32] [BASELINE_EVIDENCE.json]\ndiffprowl replay REPLAY.json\ndiffprowl shadow-plan REQUEST.json\ndiffprowl observe <playwright|appium> --scope SCOPE.json --output NEW_DIR [--baseline BASELINE.json] [--runtime-id ID] -- FULL_COMMAND ...\ndiffprowl qualify REPOSITORY SCOPE.json CAMPAIGN.json OUTPUT_DIR [--python PYTHON] [--timeout SECONDS] [--full-every N]\n\nDefects: none, double_release, missing_authorization, lost_cancellation, double_settlement, duplicate_submission\nExit codes: 0 success/matching replay, 1 detected regression or failed experiment, 2 invalid input/I/O.\nLocal fixture only. Evidence is trusted local input, not a signed CI attestation."
             );
             Ok(0)
         }
